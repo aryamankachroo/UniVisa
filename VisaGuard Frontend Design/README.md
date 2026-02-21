@@ -1,7 +1,7 @@
 
-  # VisaGuard Frontend Design
+  # UniVisa
 
-  This is a code bundle for VisaGuard Frontend Design. The original project is available at https://www.figma.com/design/ae2qBWQzDOtWqN3ikovBSF/VisaGuard-Frontend-Design.
+  UniVisa frontend. The original design is available at https://www.figma.com/design/ae2qBWQzDOtWqN3ikovBSF/VisaGuard-Frontend-Design.
 
   ## Running the code
 

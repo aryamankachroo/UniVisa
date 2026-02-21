@@ -63,7 +63,7 @@ export default function Dashboard() {
           <Link to="/dashboard" className="flex items-center gap-2">
             <Shield className="w-8 h-8 text-primary" />
             <span className="text-xl font-bold" style={{ fontFamily: "var(--font-family-heading)" }}>
-              VisaGuard
+              UniVisa
             </span>
           </Link>
         </div>

@@ -52,7 +52,7 @@ export default function Onboarding() {
 
   const handleSubmit = () => {
     // Store form data in localStorage for demo purposes
-    localStorage.setItem("visaGuardUser", JSON.stringify(formData));
+    localStorage.setItem("uniVisaUser", JSON.stringify(formData));
     navigate("/dashboard");
   };
 
@@ -67,7 +67,7 @@ export default function Onboarding() {
             <div className="flex items-center justify-center gap-2 mb-4">
               <Shield className="w-12 h-12 text-primary" />
               <h1 className="text-4xl font-bold" style={{ fontFamily: "var(--font-family-heading)" }}>
-                VisaGuard
+                UniVisa
               </h1>
             </div>
             <p className="text-lg text-muted-foreground">
@@ -120,10 +120,6 @@ export default function Onboarding() {
             </button>
           </motion.div>
 
-          {/* Demo Note */}
-          <div className="mt-8 text-center text-sm text-muted-foreground">
-            <p>Demo app featuring Riya Sharma, an MS Computer Science student at Georgia Tech</p>
-          </div>
         </div>
       </div>
     );
@@ -137,7 +133,7 @@ export default function Onboarding() {
           <div className="flex items-center justify-center gap-2 mb-3">
             <Shield className="w-10 h-10 text-primary" />
             <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-family-heading)" }}>
-              VisaGuard
+              UniVisa
             </h1>
           </div>
           <p className="text-muted-foreground">

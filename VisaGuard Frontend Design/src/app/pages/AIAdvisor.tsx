@@ -16,7 +16,7 @@ interface Message {
 const INITIAL_MESSAGES: Message[] = [
   {
     id: 1,
-    message: "Hi Riya! I'm your VisaGuard AI advisor. I'm here to help you navigate F-1 visa compliance. I can answer questions about work authorization, travel, OPT/CPT, and more. All my responses are grounded in official USCIS policy documents.",
+    message: "Hi Riya! I'm your UniVisa AI advisor. I'm here to help you navigate F-1 visa compliance. I can answer questions about work authorization, travel, OPT/CPT, and more. All my responses are grounded in official USCIS policy documents.",
     isAI: true,
     timestamp: "Just now",
   },
@@ -108,7 +108,7 @@ export default function AIAdvisor() {
           <Link to="/dashboard" className="flex items-center gap-2">
             <Shield className="w-8 h-8 text-primary" />
             <span className="text-xl font-bold" style={{ fontFamily: "var(--font-family-heading)" }}>
-              VisaGuard
+              UniVisa
             </span>
           </Link>
         </div>

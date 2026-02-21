@@ -137,7 +137,7 @@ export default function DSODashboard() {
           <Link to="/" className="flex items-center gap-2">
             <Shield className="w-8 h-8 text-primary" />
             <span className="text-2xl font-bold" style={{ fontFamily: "var(--font-family-heading)" }}>
-              VisaGuard
+              UniVisa
             </span>
             <span className="ml-2 text-sm text-muted-foreground">DSO Portal</span>
           </Link>

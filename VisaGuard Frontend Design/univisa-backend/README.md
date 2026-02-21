@@ -1,6 +1,6 @@
 # UniVisa Backend
 
-AI-powered visa compliance risk prediction for F-1/J-1 international students (UniVisa / VisaGuard hackathon).
+AI-powered visa compliance risk prediction for F-1/J-1 international students (UniVisa).
 
 ## Setup
 
