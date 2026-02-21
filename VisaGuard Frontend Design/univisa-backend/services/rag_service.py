@@ -1,15 +1,21 @@
 """RAG pipeline: embed query -> vector search -> Claude with context.
-Uses ChromaDB for vector store (hackathon); replace with Actian VectorAI DB when available.
+Uses Actian VectorAI DB when ACTIAN_VECTORAI_URL is set (see github.com/hackmamba-io/actian-vectorAI-db-beta),
+otherwise ChromaDB (data/chroma_db/).
 """
 import os
 from pathlib import Path
 
 from models.student import StudentProfile
 
+# all-MiniLM-L6-v2 embedding dimension
+EMBED_DIM = 384
+COLLECTION_NAME = "uscis_docs"
+
 # Lazy-loaded to avoid slow startup when not using chat
 _embedding_model = None
 _chroma_client = None
 _chroma_collection = None
+_actian_client = None
 
 
 def _get_embedding_model():
@@ -18,6 +24,41 @@ def _get_embedding_model():
         from sentence_transformers import SentenceTransformer
         _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
     return _embedding_model
+
+
+def _use_actian() -> bool:
+    return bool(os.getenv("ACTIAN_VECTORAI_URL", "").strip())
+
+
+def _get_actian_client():
+    """Lazy init Actian VectorAI DB client (requires actiancortex wheel from actian-vectorAI-db-beta)."""
+    global _actian_client
+    if _actian_client is None:
+        try:
+            from cortex import CortexClient, DistanceMetric
+        except ImportError as e:
+            raise ImportError(
+                "Actian VectorAI DB is set (ACTIAN_VECTORAI_URL) but the cortex client is not installed. "
+                "Install from: https://github.com/hackmamba-io/actian-vectorAI-db-beta "
+                "e.g. pip install actiancortex-0.1.0b1-py3-none-any.whl"
+            ) from e
+        url = os.getenv("ACTIAN_VECTORAI_URL", "localhost:50051").strip()
+        if url.startswith("http://"):
+            url = url[7:]
+        if url.startswith("https://"):
+            url = url[8:]
+        host, _, port = url.partition(":")
+        if not port:
+            port = "50051"
+        addr = f"{host}:{port}"
+        _actian_client = CortexClient(addr)
+        if not _actian_client.has_collection(COLLECTION_NAME):
+            _actian_client.create_collection(
+                name=COLLECTION_NAME,
+                dimension=EMBED_DIM,
+                distance_metric=DistanceMetric.COSINE,
+            )
+    return _actian_client
 
 
 def _get_chroma_collection():
@@ -29,7 +70,7 @@ def _get_chroma_collection():
         persist_dir = str(Path(__file__).resolve().parent.parent / "data" / "chroma_db")
         _chroma_client = chromadb.PersistentClient(path=persist_dir, settings=Settings(anonymized_telemetry=False))
         _chroma_collection = _chroma_client.get_or_create_collection(
-            name="uscis_docs",
+            name=COLLECTION_NAME,
             metadata={"description": "USCIS policy document chunks"},
         )
     return _chroma_collection
@@ -52,7 +93,24 @@ You know the student's profile: {student_context}
 
 
 def _vector_search(embedding: list[float], top_k: int = 5) -> list[dict]:
-    """Query ChromaDB for top_k relevant chunks. Returns list of {source, text}."""
+    """Query vector store for top_k relevant chunks. Returns list of {source, text}."""
+    if _use_actian():
+        try:
+            client = _get_actian_client()
+            n = client.count(COLLECTION_NAME)
+            if n == 0:
+                return []
+            results = client.search(COLLECTION_NAME, query=embedding, top_k=min(top_k, n))
+            out = []
+            for r in results:
+                payload = r.payload if hasattr(r, "payload") else {}
+                out.append({
+                    "source": payload.get("source", "USCIS"),
+                    "text": payload.get("text", ""),
+                })
+            return out
+        except Exception as e:
+            return []
     coll = _get_chroma_collection()
     n = coll.count()
     if n == 0:

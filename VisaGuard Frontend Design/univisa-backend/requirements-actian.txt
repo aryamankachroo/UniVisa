@@ -1,0 +1,4 @@
+# Actian VectorAI DB Python client (optional). Requires Python 3.10+.
+# Install after requirements.txt when using ACTIAN_VECTORAI_URL.
+#   python3 -m pip install "https://github.com/hackmamba-io/actian-vectorAI-db-beta/raw/main/actiancortex-0.1.0b1-py3-none-any.whl"
+# If you have Python 3.9, leave ACTIAN_VECTORAI_URL unset and the app will use ChromaDB for RAG.
