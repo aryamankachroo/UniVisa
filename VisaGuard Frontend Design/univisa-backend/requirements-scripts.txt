@@ -1,0 +1,8 @@
+# Data pipeline scripts only (fetch_reddit, cluster_reddit).
+# Install only if you need to run: python scripts/cluster_reddit.py
+# On Windows without Visual Studio, these may fail to build; use WSL or skip.
+-r requirements.txt
+pandas>=2.0.0
+numpy>=1.24.0
+hdbscan==0.8.38
+umap-learn==0.5.6
