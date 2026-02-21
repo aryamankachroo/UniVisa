@@ -12,7 +12,7 @@ pydantic-settings==2.6.1
 anthropic==0.39.0
 sentence-transformers==3.3.1
 
-# Vector store (RAG) - ChromaDB for hackathon
+# Vector store (RAG) - ChromaDB by default; set ACTIAN_VECTORAI_URL + install actiancortex for Actian VectorAI DB
 chromadb==0.5.23
 
 # Optional: for scripts/fetch_reddit.py (pure Python)

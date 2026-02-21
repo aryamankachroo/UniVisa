@@ -1,0 +1,10 @@
+# Actian VectorAI DB for RAG (optional).
+# See https://github.com/hackmamba-io/actian-vectorAI-db-beta
+# Start: docker compose -f docker-compose.actian.yml up -d
+# Then set ACTIAN_VECTORAI_URL=localhost:50051 in .env and install the cortex Python client.
+services:
+  vectoraidb:
+    image: williamimoh/actian-vectorai-db:1.0b
+    ports:
+      - "50051:50051"
+    restart: unless-stopped

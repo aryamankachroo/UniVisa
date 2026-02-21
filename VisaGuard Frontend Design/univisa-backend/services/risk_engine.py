@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 from datetime import date
+from typing import Optional
 
 from models.student import StudentProfile, EnrollmentStatus
 from models.risk import RiskFlag, RiskOutput
@@ -19,7 +20,7 @@ CLUSTER_LABELS: dict[str, str] = {
 }
 
 
-def _load_cluster_insight(category: str) -> str | None:
+def _load_cluster_insight(category: str) -> Optional[str]:
     """Return reddit_insight label for a flag category from clusters.json."""
     path = Path(__file__).resolve().parent.parent / "data" / "clusters.json"
     if not path.exists():
@@ -35,7 +36,7 @@ def _load_cluster_insight(category: str) -> str | None:
         return CLUSTER_LABELS.get(category)
 
 
-def calculate_risk(profile: StudentProfile, today: date | None = None) -> RiskOutput:
+def calculate_risk(profile: StudentProfile, today: Optional[date] = None) -> RiskOutput:
     """Rule-based risk score and flags. today defaults to date.today()."""
     if today is None:
         today = date.today()

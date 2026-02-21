@@ -61,9 +61,7 @@ Risk score and flags depend on the current date (e.g. OPT window proximity, prog
 
 - **Reddit:** `python scripts/fetch_reddit.py` (needs Reddit API keys in `.env`). Writes `data/reddit_posts.json`.
 - **Clustering:** `python scripts/cluster_reddit.py`. Reads `data/reddit_posts.json`, writes `data/clusters.json`. Update cluster labels there for risk engine `reddit_insight`.
-- **USCIS docs:** Place plain-text `.txt` files in `data/uscis_docs/`, then run `python scripts/ingest_docs.py` to chunk, embed, and store in ChromaDB for RAG.
-
-Vector store is ChromaDB (persisted in `data/chroma_db/`) for the hackathon; replace with Actian VectorAI DB when available.
+- **USCIS docs:** Place plain-text `.txt` files in `data/uscis_docs/`, then run `python scripts/ingest_docs.py` to chunk, embed, and store for RAG. By default uses ChromaDB (`data/chroma_db/`). To use **Actian VectorAI DB** instead, set `ACTIAN_VECTORAI_URL=localhost:50051` in `.env`, start the DB (`docker compose -f docker-compose.actian.yml up -d`), install the [Actian VectorAI DB Python client](https://github.com/hackmamba-io/actian-vectorAI-db-beta) (e.g. `pip install actiancortex-0.1.0b1-py3-none-any.whl` from that repo), then run `ingest_docs.py` again.
 
 ## Project layout
 

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, field_validator
-from typing import Optional
+from typing import Optional, Union
 from datetime import date
 from enum import Enum
 
@@ -15,7 +15,7 @@ class EnrollmentStatus(str, Enum):
     ON_BREAK = "on_break"
 
 
-def _normalize_enrollment(v: str | EnrollmentStatus) -> EnrollmentStatus:
+def _normalize_enrollment(v: Union[str, EnrollmentStatus]) -> EnrollmentStatus:
     if isinstance(v, EnrollmentStatus):
         return v
     m = {"full_time": EnrollmentStatus.FULL_TIME, "Full-time": EnrollmentStatus.FULL_TIME,
@@ -46,7 +46,7 @@ class StudentProfileCreate(BaseModel):
 
     @field_validator("enrollment_status", mode="before")
     @classmethod
-    def normalize_enrollment(cls, v: str | EnrollmentStatus) -> EnrollmentStatus:
+    def normalize_enrollment(cls, v: Union[str, EnrollmentStatus]) -> EnrollmentStatus:
         return _normalize_enrollment(v)
 
 
