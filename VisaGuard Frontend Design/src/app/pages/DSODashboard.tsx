@@ -7,6 +7,7 @@ import { StudentRow } from "../components/StudentRow";
 import { RiskBadge } from "../components/RiskBadge";
 import { Button } from "../components/ui/button";
 import { motion } from "motion/react";
+import { toast } from "sonner";
 
 const STUDENTS_DATA = [
   {
@@ -381,7 +382,13 @@ export default function DSODashboard() {
                 </div>
 
                 <div className="space-y-2">
-                  <Button className="w-full bg-primary hover:bg-primary/90">
+                  <Button
+                    type="button"
+                    className="w-full bg-primary hover:bg-primary/90"
+                    onClick={() => {
+                      toast.success("Student has been notified.");
+                    }}
+                  >
                     Notify Student
                   </Button>
                   <Button variant="outline" className="w-full">
