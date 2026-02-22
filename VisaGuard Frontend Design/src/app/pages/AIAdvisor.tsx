@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Send } from "lucide-react";
 import { ChatBubble } from "../components/ChatBubble";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { API_BASE, getStudentId } from "../lib/api";
 
 interface Message {
   id: number;
@@ -28,26 +29,6 @@ const QUICK_QUESTIONS = [
   "Do I need to report my new address?",
 ];
 
-// Mock AI responses
-const AI_RESPONSES: Record<string, { message: string; source: string }> = {
-  "Can I work more than 20hrs this week?": {
-    message: "During the school term, F-1 students are limited to 20 hours per week of on-campus employment. However, during official school breaks and vacation periods (like summer vacation), you may work full-time (more than 20 hours per week) on-campus. If you need to work more than 20 hours during the term, you would need special authorization like CPT or an economic hardship waiver, which requires approval from your DSO and USCIS.",
-    source: "USCIS F-1 Employment Guidelines §3.1.2",
-  },
-  "What happens if I miss my OPT deadline?": {
-    message: "Missing your OPT application deadline can have serious consequences. You must apply for OPT within the 30-day window before your program end date and up to 60 days after. If you miss this window, you will not be eligible for OPT and would need to leave the U.S. or change your status. I strongly recommend setting up reminders and starting your application preparation at least 90 days before your program ends. Would you like me to help you create a preparation checklist?",
-    source: "USCIS OPT Guide §4.2",
-  },
-  "Do I need to report my new address?": {
-    message: "Yes! F-1 students must report any change of address to USCIS within 10 days of moving. You can do this through the USCIS Change of Address online form or by mail using Form AR-11. Additionally, you should inform your DSO of your new address so they can update your SEVIS record. Failure to report a change of address is a violation of your F-1 status and can lead to serious consequences.",
-    source: "USCIS F-1 Regulations §8 CFR 265.1",
-  },
-  default: {
-    message: "I understand your question. Based on F-1 visa regulations, I recommend consulting with your Designated School Official (DSO) for specific guidance on your situation. Your DSO can provide personalized advice based on your unique circumstances and ensure you remain in compliance with all visa requirements.",
-    source: "USCIS F-1 General Guidelines",
-  },
-};
-
 export default function AIAdvisor() {
   const navigate = useNavigate();
   const [activeNav, setActiveNav] = useState("ai");
@@ -55,6 +36,8 @@ export default function AIAdvisor() {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const nextIdRef = useRef(2);
+  const [chatStatus, setChatStatus] = useState<{ ok: boolean; gemini_configured: boolean } | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -64,35 +47,76 @@ export default function AIAdvisor() {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = (messageText?: string) => {
+  useEffect(() => {
+    fetch(`${API_BASE}/chat/status`)
+      .then((r) => r.json())
+      .then((data) => setChatStatus({ ok: true, gemini_configured: !!data?.gemini_configured }))
+      .catch(() => setChatStatus({ ok: false, gemini_configured: false }));
+  }, []);
+
+  const handleSendMessage = async (messageText?: string) => {
     const text = messageText || input;
     if (!text.trim()) return;
 
-    // Add user message
+    const userMsgId = nextIdRef.current++;
     const userMessage: Message = {
-      id: messages.length + 1,
+      id: userMsgId,
       message: text,
       isAI: false,
       timestamp: "Just now",
     };
-
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsTyping(true);
 
-    // Simulate AI response delay
-    setTimeout(() => {
-      const response = AI_RESPONSES[text] || AI_RESPONSES.default;
+    const aiMsgId = nextIdRef.current++;
+
+    try {
+      const studentId = getStudentId();
+      const res = await fetch(`${API_BASE}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ student_id: studentId, question: text }),
+      });
+      const data = await res.json().catch(() => ({}));
+      let answer: string;
+      if (res.ok) {
+        const raw = data.answer;
+        answer =
+          typeof raw === "string" && raw.trim() !== ""
+            ? raw.trim()
+            : "No response.";
+      } else {
+        const detail = data.detail;
+        if (typeof detail === "string") answer = detail;
+        else if (Array.isArray(detail) && detail[0]?.msg) answer = detail.map((d: { msg?: string }) => d.msg).join(". ");
+        else answer = "Could not reach the server. Is the backend running at " + API_BASE + "?";
+      }
+      const source =
+        res.ok && Array.isArray(data.sources) && data.sources.length > 0
+          ? data.sources.join(", ")
+          : undefined;
       const aiMessage: Message = {
-        id: messages.length + 2,
-        message: response.message,
+        id: aiMsgId,
+        message: answer,
         isAI: true,
-        source: response.source,
+        source,
         timestamp: "Just now",
       };
       setMessages((prev) => [...prev, aiMessage]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: aiMsgId,
+          message: "Could not reach the server at " + API_BASE + ". Make sure the backend is running.",
+          isAI: true,
+          timestamp: "Just now",
+        },
+      ]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const handleNavigation = (path: string, nav: string) => {
@@ -185,7 +209,19 @@ export default function AIAdvisor() {
           <p className="text-sm text-muted-foreground">
             Ask me anything about F-1 visa compliance
           </p>
-          
+          {chatStatus && !chatStatus.ok && (
+            <div className="mt-3 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+              <strong>Backend not reachable.</strong> Start it from the project folder:{" "}
+              <code className="bg-muted px-1 rounded">cd univisa-backend && ./run.sh</code> — then refresh. API: {API_BASE}
+            </div>
+          )}
+          {chatStatus?.ok && !chatStatus.gemini_configured && (
+            <div className="mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-700 dark:text-amber-400">
+              <strong>AI not configured.</strong> Add <code className="bg-muted px-1 rounded">GEMINI_API_KEY</code> to{" "}
+              <code className="bg-muted px-1 rounded">univisa-backend/.env</code> (get a key at{" "}
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="underline">Google AI Studio</a>) and restart the backend.
+            </div>
+          )}
           {/* Quick Questions */}
           <div className="flex flex-wrap gap-2 mt-4">
             {QUICK_QUESTIONS.map((question) => (
