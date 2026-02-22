@@ -4,7 +4,6 @@ import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Briefcase, Search, Fi
 import { RiskScoreGauge } from "../components/RiskScoreGauge";
 import { RiskBadge } from "../components/RiskBadge";
 import { DeadlineCountdown } from "../components/DeadlineCountdown";
-import { InsightCard } from "../components/InsightCard";
 import { Button } from "../components/ui/button";
 import { motion } from "motion/react";
 
@@ -226,48 +225,32 @@ export default function Dashboard() {
               </div>
             </motion.div>
 
-            {/* Student Insights */}
+            {/* AI Advisor */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
+              className="bg-card border border-border rounded-lg p-6 min-h-[320px] flex flex-col items-center text-center"
             >
-              <InsightCard
-                title="Student Insights"
-                description="67% of F-1 students from India report confusion around OPT timing"
-                percentage={67}
-                source="r/internationalstudents analysis"
-              />
-            </motion.div>
-          </div>
-
-          {/* AI Advisor Preview */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="bg-card border border-border rounded-lg p-6"
-          >
-            <h3 className="text-lg font-semibold mb-4">AI Advisor</h3>
-            <div className="bg-background rounded-lg p-4 border border-border mb-4">
-              <div className="flex gap-3">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                  <Bot className="w-5 h-5 text-primary-foreground" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm leading-relaxed">
+              <h3 className="text-lg font-semibold mb-5">AI Advisor</h3>
+              <div className="bg-background rounded-lg p-5 border border-border mb-6 flex-1 flex flex-col min-h-0 w-full">
+                <div className="flex flex-col gap-4 flex-1 items-center justify-center">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+                    <Bot className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <p className="text-sm leading-relaxed text-center">
                     {DEMO_DATA.aiPreview.message}
                   </p>
                 </div>
               </div>
-            </div>
-            <Button
-              onClick={() => handleNavigation("/ai-advisor", "ai")}
-              className="bg-primary hover:bg-primary/90"
-            >
-              Continue Conversation
-            </Button>
-          </motion.div>
+              <Button
+                onClick={() => handleNavigation("/ai-advisor", "ai")}
+                className="w-full bg-primary hover:bg-primary/90"
+              >
+                Continue Conversation
+              </Button>
+            </motion.div>
+          </div>
         </div>
       </main>
     </div>
