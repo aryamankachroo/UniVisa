@@ -10,6 +10,7 @@ pydantic-settings==2.6.1
 
 # AI & Embeddings
 anthropic==0.39.0
+google-generativeai>=0.8.0
 sentence-transformers==3.3.1
 
 # Vector store (RAG) - ChromaDB by default; set ACTIAN_VECTORAI_URL + install actiancortex for Actian VectorAI DB

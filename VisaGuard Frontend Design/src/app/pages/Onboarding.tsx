@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { Button } from "../components/ui/button";
@@ -7,6 +7,20 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Slider } from "../components/ui/slider";
 import { Shield, GraduationCap, Users, ArrowRight } from "lucide-react";
+
+const API_BASE = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "http://localhost:8000";
+const UNIVERSITIES_API = `${API_BASE}/universities`;
+
+const COUNTRIES = [
+  "Afghanistan", "Albania", "Algeria", "Argentina", "Australia", "Austria", "Bangladesh", "Belgium", "Brazil", "Bulgaria",
+  "Canada", "Chile", "China", "Colombia", "Costa Rica", "Croatia", "Czech Republic", "Denmark", "Egypt", "Estonia",
+  "Finland", "France", "Germany", "Ghana", "Greece", "Hong Kong", "Hungary", "Iceland", "India", "Indonesia",
+  "Iran", "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya",
+  "South Korea", "Kuwait", "Lebanon", "Malaysia", "Mexico", "Morocco", "Netherlands", "New Zealand", "Nigeria", "Norway",
+  "Pakistan", "Peru", "Philippines", "Poland", "Portugal", "Romania", "Russia", "Saudi Arabia", "Singapore", "South Africa",
+  "Spain", "Sri Lanka", "Sweden", "Switzerland", "Taiwan", "Thailand", "Turkey", "Ukraine", "United Arab Emirates", "United Kingdom",
+  "United States", "Venezuela", "Vietnam", "Other",
+];
 
 interface FormData {
   fullName: string;
@@ -45,6 +59,23 @@ export default function Onboarding() {
     changeEmployer: false,
     courseChanges: false,
   });
+
+  const [universities, setUniversities] = useState<string[]>([]);
+  const [universitiesLoading, setUniversitiesLoading] = useState(true);
+  const [universitiesError, setUniversitiesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(UNIVERSITIES_API)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load");
+        return res.json();
+      })
+      .then((names: string[]) => {
+        setUniversities(Array.isArray(names) ? names : []);
+      })
+      .catch(() => setUniversitiesError("Could not load universities. Is the backend running?"))
+      .finally(() => setUniversitiesLoading(false));
+  }, []);
 
   const updateField = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -186,16 +217,20 @@ export default function Onboarding() {
                   <Select
                     value={formData.university}
                     onValueChange={(value) => updateField("university", value)}
+                    disabled={universitiesLoading}
                   >
                     <SelectTrigger className="mt-1.5">
-                      <SelectValue placeholder="Select your university" />
+                      <SelectValue placeholder={universitiesLoading ? "Loading…" : "Select your university"} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Georgia Tech">Georgia Institute of Technology</SelectItem>
-                      <SelectItem value="MIT">Massachusetts Institute of Technology</SelectItem>
-                      <SelectItem value="UCLA">University of California, Los Angeles</SelectItem>
-                      <SelectItem value="Stanford">Stanford University</SelectItem>
-                      <SelectItem value="Harvard">Harvard University</SelectItem>
+                      {universitiesError && (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">{universitiesError}</div>
+                      )}
+                      {universities.map((name) => (
+                        <SelectItem key={name} value={name}>
+                          {name}
+                        </SelectItem>
+                      ))}
                       <SelectItem value="Other">Other</SelectItem>
                     </SelectContent>
                   </Select>
@@ -211,13 +246,11 @@ export default function Onboarding() {
                       <SelectValue placeholder="Select your country" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="India">India</SelectItem>
-                      <SelectItem value="China">China</SelectItem>
-                      <SelectItem value="South Korea">South Korea</SelectItem>
-                      <SelectItem value="Canada">Canada</SelectItem>
-                      <SelectItem value="Mexico">Mexico</SelectItem>
-                      <SelectItem value="Brazil">Brazil</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
+                      {COUNTRIES.map((country) => (
+                        <SelectItem key={country} value={country}>
+                          {country}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

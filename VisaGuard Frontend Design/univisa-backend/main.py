@@ -1,7 +1,12 @@
 """
 UniVisa Backend — AI-powered visa compliance risk prediction for F-1/J-1 students.
 """
+import urllib.request
+import json
 from datetime import date
+
+from dotenv import load_dotenv
+load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +22,16 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -64,3 +78,16 @@ def startup() -> None:
 @app.get("/")
 def root() -> dict:
     return {"message": "UniVisa API", "docs": "/docs"}
+
+
+@app.get("/universities")
+def get_universities() -> list[str]:
+    """Proxy Hipo Labs API to avoid CORS; returns sorted, deduplicated US university names."""
+    url = "https://universities.hipolabs.com/search?country=United%20States"
+    try:
+        with urllib.request.urlopen(url, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+    except Exception:
+        return []
+    names = sorted({u["name"] for u in data if isinstance(u.get("name"), str)})
+    return names

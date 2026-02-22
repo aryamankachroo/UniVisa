@@ -1,4 +1,4 @@
-"""RAG pipeline: embed query -> vector search -> Claude with context.
+"""RAG pipeline: embed query -> vector search -> LLM (Gemini 2.5 Flash preferred, fallback Claude) with context.
 Uses Actian VectorAI DB when ACTIAN_VECTORAI_URL is set (see github.com/hackmamba-io/actian-vectorAI-db-beta),
 otherwise ChromaDB (data/chroma_db/).
 """
@@ -131,13 +131,10 @@ def query_rag(question: str, student_profile: StudentProfile) -> dict:
     query_embedding = model.encode(question).tolist()
     relevant_chunks = _vector_search(query_embedding, top_k=5)
 
-    if not relevant_chunks:
-        return {
-            "answer": "No policy documents have been ingested yet. For accurate F-1/J-1 guidance, please contact your Designated School Official (DSO) or international student office.",
-            "sources": [],
-        }
-    context = "\n\n".join(
-        f"[{chunk['source']}]\n{chunk['text']}" for chunk in relevant_chunks
+    context = (
+        "\n\n".join(f"[{chunk['source']}]\n{chunk['text']}" for chunk in relevant_chunks)
+        if relevant_chunks
+        else "(No policy documents have been ingested yet. Answer from your knowledge of F-1/J-1 rules and recommend the student confirm with their DSO for official guidance.)"
     )
     student_context = f"""
     University: {student_profile.university}
@@ -147,10 +144,35 @@ def query_rag(question: str, student_profile: StudentProfile) -> dict:
     On OPT: {student_profile.on_opt}
     Weekly work hours: {student_profile.weekly_work_hours}
     """
+    # Prefer Gemini 2.5 Flash (GOOGLE_API_KEY or GEMINI_API_KEY), fallback to Anthropic
+    gemini_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY") or os.getenv("gemini_api_key")
+    if gemini_key:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=gemini_key.strip())
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            full_prompt = (
+                SYSTEM_PROMPT.format(student_context=student_context)
+                + "\n\nContext:\n"
+                + context
+                + "\n\nQuestion: "
+                + question
+            )
+            response = model.generate_content(full_prompt)
+            text = response.text if response.text else ""
+            return {
+                "answer": text,
+                "sources": [chunk["source"] for chunk in relevant_chunks],
+            }
+        except Exception as e:
+            return {
+                "answer": f"Sorry, the AI advisor encountered an error. Please try again or contact your DSO. Error: {e!s}",
+                "sources": [chunk["source"] for chunk in relevant_chunks],
+            }
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         return {
-            "answer": "AI advisor is not configured (missing ANTHROPIC_API_KEY). Please contact your DSO for visa compliance questions.",
+            "answer": "AI advisor is not configured (set GOOGLE_API_KEY or GEMINI_API_KEY in .env). Please contact your DSO for visa compliance questions.",
             "sources": [chunk["source"] for chunk in relevant_chunks],
         }
     try:

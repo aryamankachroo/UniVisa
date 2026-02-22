@@ -4,6 +4,7 @@ import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Send } from "lucide-r
 import { ChatBubble } from "../components/ChatBubble";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { getAnswer } from "../UniVisaAdvisor";
 
 interface Message {
   id: number;
@@ -16,7 +17,7 @@ interface Message {
 const INITIAL_MESSAGES: Message[] = [
   {
     id: 1,
-    message: "Hi Riya! I'm your UniVisa AI advisor. I'm here to help you navigate F-1 visa compliance. I can answer questions about work authorization, travel, OPT/CPT, and more. All my responses are grounded in official USCIS policy documents.",
+    message: "Hi! I'm your UniVisa AI advisor. I'm here to help with F-1/J-1 visa compliance. Ask me about work authorization, travel, OPT/CPT, address reporting, or anything else — I'll answer from our policy Q&A.",
     isAI: true,
     timestamp: "Just now",
   },
@@ -28,32 +29,13 @@ const QUICK_QUESTIONS = [
   "Do I need to report my new address?",
 ];
 
-// Mock AI responses
-const AI_RESPONSES: Record<string, { message: string; source: string }> = {
-  "Can I work more than 20hrs this week?": {
-    message: "During the school term, F-1 students are limited to 20 hours per week of on-campus employment. However, during official school breaks and vacation periods (like summer vacation), you may work full-time (more than 20 hours per week) on-campus. If you need to work more than 20 hours during the term, you would need special authorization like CPT or an economic hardship waiver, which requires approval from your DSO and USCIS.",
-    source: "USCIS F-1 Employment Guidelines §3.1.2",
-  },
-  "What happens if I miss my OPT deadline?": {
-    message: "Missing your OPT application deadline can have serious consequences. You must apply for OPT within the 30-day window before your program end date and up to 60 days after. If you miss this window, you will not be eligible for OPT and would need to leave the U.S. or change your status. I strongly recommend setting up reminders and starting your application preparation at least 90 days before your program ends. Would you like me to help you create a preparation checklist?",
-    source: "USCIS OPT Guide §4.2",
-  },
-  "Do I need to report my new address?": {
-    message: "Yes! F-1 students must report any change of address to USCIS within 10 days of moving. You can do this through the USCIS Change of Address online form or by mail using Form AR-11. Additionally, you should inform your DSO of your new address so they can update your SEVIS record. Failure to report a change of address is a violation of your F-1 status and can lead to serious consequences.",
-    source: "USCIS F-1 Regulations §8 CFR 265.1",
-  },
-  default: {
-    message: "I understand your question. Based on F-1 visa regulations, I recommend consulting with your Designated School Official (DSO) for specific guidance on your situation. Your DSO can provide personalized advice based on your unique circumstances and ensure you remain in compliance with all visa requirements.",
-    source: "USCIS F-1 General Guidelines",
-  },
-};
-
 export default function AIAdvisor() {
   const navigate = useNavigate();
   const [activeNav, setActiveNav] = useState("ai");
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -64,35 +46,33 @@ export default function AIAdvisor() {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = (messageText?: string) => {
-    const text = messageText || input;
-    if (!text.trim()) return;
+  const handleSendMessage = async (messageText?: string) => {
+    const text = (messageText || input).trim();
+    if (!text) return;
 
-    // Add user message
     const userMessage: Message = {
       id: messages.length + 1,
       message: text,
       isAI: false,
       timestamp: "Just now",
     };
-
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setChatError(null);
     setIsTyping(true);
 
-    // Simulate AI response delay
+    // Answer from hardcoded UniVisaAdvisor Q&A (no API call)
     setTimeout(() => {
-      const response = AI_RESPONSES[text] || AI_RESPONSES.default;
+      const answer = getAnswer(text);
       const aiMessage: Message = {
         id: messages.length + 2,
-        message: response.message,
+        message: answer,
         isAI: true,
-        source: response.source,
         timestamp: "Just now",
       };
       setMessages((prev) => [...prev, aiMessage]);
       setIsTyping(false);
-    }, 1500);
+    }, 900);
   };
 
   const handleNavigation = (path: string, nav: string) => {
@@ -183,9 +163,11 @@ export default function AIAdvisor() {
         <div className="border-b border-border p-6 bg-card">
           <h1 className="text-2xl font-semibold mb-2">AI Advisor</h1>
           <p className="text-sm text-muted-foreground">
-            Ask me anything about F-1 visa compliance
+            Ask me anything about F-1 visa compliance (answers from UniVisa Q&A)
           </p>
-          
+          {chatError && (
+            <p className="mt-2 text-sm text-destructive">{chatError}</p>
+          )}
           {/* Quick Questions */}
           <div className="flex flex-wrap gap-2 mt-4">
             {QUICK_QUESTIONS.map((question) => (
