@@ -34,7 +34,11 @@ export default function Alerts() {
   const sid = getStudentId();
 
   useEffect(() => {
-    getAlerts(sid)
+    const ALERT_TIMEOUT_MS = 5000;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("timeout")), ALERT_TIMEOUT_MS);
+    });
+    Promise.race([getAlerts(sid), timeoutPromise])
       .then((list) => {
         setAlerts(
           list.map((a, i) => ({

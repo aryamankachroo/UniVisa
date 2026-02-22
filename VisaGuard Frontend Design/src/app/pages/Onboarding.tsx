@@ -23,11 +23,19 @@ const COUNTRIES = [
   "United States", "Venezuela", "Vietnam", "Other",
 ];
 
+const TOP_UNIVERSITIES = [
+  "Georgia Institute of Technology",
+  "MIT",
+  "Stanford University",
+  "UC Berkeley",
+  "Carnegie Mellon University",
+];
+
 interface FormData {
   fullName: string;
   university: string;
   country: string;
-  visaType: "F-1" | "J-1";
+  visaType: "F-1" | "J-1" | "";
   programStart: string;
   programEnd: string;
   enrollmentStatus: string;
@@ -48,7 +56,7 @@ export default function Onboarding() {
     fullName: "",
     university: "",
     country: "",
-    visaType: "F-1",
+    visaType: "",
     programStart: "",
     programEnd: "",
     enrollmentStatus: "Full-time",
@@ -61,8 +69,8 @@ export default function Onboarding() {
     courseChanges: false,
   });
 
-  const [universities, setUniversities] = useState<string[]>([]);
-  const [universitiesLoading, setUniversitiesLoading] = useState(true);
+  const [universities, setUniversities] = useState<string[]>(TOP_UNIVERSITIES);
+  const [universitiesLoading, setUniversitiesLoading] = useState(false);
   const [universitiesError, setUniversitiesError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,10 +80,13 @@ export default function Onboarding() {
         return res.json();
       })
       .then((names: string[]) => {
-        setUniversities(Array.isArray(names) ? names : []);
+        if (Array.isArray(names) && names.length > 0) {
+          setUniversities(names);
+        }
       })
-      .catch(() => setUniversitiesError("Could not load universities. Is the backend running?"))
-      .finally(() => setUniversitiesLoading(false));
+      .catch(() => {
+        // Keep TOP_UNIVERSITIES as fallback; no error message so dropdown stays usable
+      });
   }, []);
 
   const updateField = (field: string, value: any) => {
@@ -212,7 +223,7 @@ export default function Onboarding() {
                   <Label htmlFor="fullName">Full Name</Label>
                   <Input
                     id="fullName"
-                    placeholder="Riya Sharma"
+                    placeholder="Enter your full name"
                     value={formData.fullName}
                     onChange={(e) => updateField("fullName", e.target.value)}
                     className="mt-1.5"
@@ -227,12 +238,9 @@ export default function Onboarding() {
                     disabled={universitiesLoading}
                   >
                     <SelectTrigger className="mt-1.5">
-                      <SelectValue placeholder={universitiesLoading ? "Loading…" : "Select your university"} />
+                      <SelectValue placeholder="Select your university" />
                     </SelectTrigger>
                     <SelectContent>
-                      {universitiesError && (
-                        <div className="px-2 py-1.5 text-sm text-muted-foreground">{universitiesError}</div>
-                      )}
                       {universities.map((name) => (
                         <SelectItem key={name} value={name}>
                           {name}
@@ -271,7 +279,7 @@ export default function Onboarding() {
                       className={`p-4 rounded-lg border-2 transition-all ${
                         formData.visaType === "F-1"
                           ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
+                          : "border-border bg-transparent hover:border-primary/50"
                       }`}
                     >
                       <div className="font-semibold mb-1">F-1 Visa</div>
@@ -285,7 +293,7 @@ export default function Onboarding() {
                       className={`p-4 rounded-lg border-2 transition-all ${
                         formData.visaType === "J-1"
                           ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
+                          : "border-border bg-transparent hover:border-primary/50"
                       }`}
                     >
                       <div className="font-semibold mb-1">J-1 Visa</div>
