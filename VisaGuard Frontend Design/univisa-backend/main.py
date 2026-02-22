@@ -2,8 +2,15 @@
 UniVisa Backend — AI-powered visa compliance risk prediction for F-1/J-1 students.
 """
 from datetime import date
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 from fastapi import FastAPI
+
+# Load .env from backend directory so API keys are always found (no matter where you run from)
+_env_path = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=_env_path)
 from fastapi.middleware.cors import CORSMiddleware
 
 from models.student import StudentProfile, VisaType, EnrollmentStatus
@@ -17,7 +24,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -64,3 +71,10 @@ def startup() -> None:
 @app.get("/")
 def root() -> dict:
     return {"message": "UniVisa API", "docs": "/docs"}
+
+
+@app.get("/chat/status")
+def chat_status() -> dict:
+    """Check if Gemini API is configured (for debugging). Does not reveal keys."""
+    import os
+    return {"ok": True, "gemini_configured": bool(os.getenv("GEMINI_API_KEY", "").strip())}
