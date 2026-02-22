@@ -6,7 +6,18 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Slider } from "../components/ui/slider";
-import { Shield, GraduationCap, Users, ArrowRight } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "../components/ui/command";
+import { Shield, GraduationCap, Users, ArrowRight, ChevronDownIcon, CheckIcon } from "lucide-react";
+import { cn } from "../components/ui/utils";
+import { UNIVERSITIES } from "../data/universities";
 
 interface FormData {
   fullName: string;
@@ -29,6 +40,7 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const [showRoleSelection, setShowRoleSelection] = useState(true);
   const [step, setStep] = useState(1);
+  const [universityOpen, setUniversityOpen] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
     university: "",
@@ -183,22 +195,55 @@ export default function Onboarding() {
 
                 <div>
                   <Label htmlFor="university">University Name</Label>
-                  <Select
-                    value={formData.university}
-                    onValueChange={(value) => updateField("university", value)}
-                  >
-                    <SelectTrigger className="mt-1.5">
-                      <SelectValue placeholder="Select your university" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Georgia Tech">Georgia Institute of Technology</SelectItem>
-                      <SelectItem value="MIT">Massachusetts Institute of Technology</SelectItem>
-                      <SelectItem value="UCLA">University of California, Los Angeles</SelectItem>
-                      <SelectItem value="Stanford">Stanford University</SelectItem>
-                      <SelectItem value="Harvard">Harvard University</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Popover open={universityOpen} onOpenChange={setUniversityOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        id="university"
+                        aria-expanded={universityOpen}
+                        aria-haspopup="listbox"
+                        aria-label="Select university"
+                        aria-controls="university-listbox"
+                        className={cn(
+                          "mt-1.5 flex h-9 w-full items-center justify-between rounded-md border border-input bg-input-background px-3 py-2 text-sm text-left transition-colors",
+                          "hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                          !formData.university && "text-muted-foreground"
+                        )}
+                      >
+                        <span className="truncate">
+                          {formData.university || "Select your university"}
+                        </span>
+                        <ChevronDownIcon className="h-4 w-4 shrink-0 opacity-50" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search university..." />
+                        <CommandList id="university-listbox" role="listbox">
+                          <CommandEmpty>No university found.</CommandEmpty>
+                          <CommandGroup>
+                            {UNIVERSITIES.map((uni) => (
+                              <CommandItem
+                                key={uni.name}
+                                value={uni.name}
+                                keywords={uni.keywords}
+                                onSelect={() => {
+                                  updateField("university", uni.name);
+                                  setUniversityOpen(false);
+                                }}
+                                className="flex items-center justify-between gap-2"
+                              >
+                                <span>{uni.name}</span>
+                                {formData.university === uni.name ? (
+                                  <CheckIcon className="h-4 w-4 shrink-0 text-primary" />
+                                ) : null}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
                 <div>

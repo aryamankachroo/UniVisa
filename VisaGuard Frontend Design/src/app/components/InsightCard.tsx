@@ -6,6 +6,8 @@ interface InsightCardProps {
   percentage: number;
   source: string;
   data?: Array<{ name: string; value: number }>;
+  /** Use inside glass bento for transparent background */
+  variant?: "default" | "minimal";
 }
 
 export function InsightCard({
@@ -14,15 +16,16 @@ export function InsightCard({
   percentage,
   source,
   data,
+  variant = "default",
 }: InsightCardProps) {
-  // Default data if none provided
   const chartData = data || [
     { name: "Confused", value: percentage },
     { name: "Clear", value: 100 - percentage },
   ];
+  const isMinimal = variant === "minimal";
 
   return (
-    <div className="bg-card rounded-lg border border-border p-4">
+    <div className={isMinimal ? "bg-transparent border-0 p-0" : "bg-card rounded-lg border border-border p-4"}>
       <h3 className="font-semibold mb-2">{title}</h3>
       <p className="text-sm text-muted-foreground mb-4">{description}</p>
 
@@ -39,7 +42,7 @@ export function InsightCard({
               {chartData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
-                  fill={index === 0 ? "#6C63FF" : "rgba(255, 255, 255, 0.1)"}
+                  fill={index === 0 ? "var(--primary)" : "rgba(0,0,0,0.06)"}
                 />
               ))}
             </Bar>

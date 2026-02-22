@@ -47,7 +47,7 @@ export function AlertCard({
   return (
     <div
       className={cn(
-        "bg-card rounded-lg border border-border p-4 flex gap-4",
+        "glass bento rounded-2xl border border-white/60 dark:border-white/10 p-5 flex gap-4",
         className
       )}
     >

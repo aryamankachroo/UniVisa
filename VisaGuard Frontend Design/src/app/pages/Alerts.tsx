@@ -57,91 +57,31 @@ export default function Alerts() {
   };
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Sidebar */}
-      <aside className="w-64 bg-card border-r border-border flex flex-col">
-        <div className="p-6 border-b border-border">
+    <div className="flex h-screen min-h-0 overflow-hidden">
+      <aside className="w-64 flex-shrink-0 flex flex-col glass bento rounded-none border-r border-white/60 dark:border-white/10 rounded-r-2xl overflow-hidden">
+        <div className="p-6 border-b border-white/40 dark:border-white/10">
           <Link to="/dashboard" className="flex items-center gap-2">
             <Shield className="w-8 h-8 text-primary" />
-            <span className="text-xl font-bold" style={{ fontFamily: "var(--font-family-heading)" }}>
-              UniVisa
-            </span>
+            <span className="text-xl font-bold tracking-tight" style={{ fontFamily: "var(--font-family-heading)" }}>UniVisa</span>
           </Link>
         </div>
-
-        <nav className="flex-1 p-4 space-y-2">
-          <button
-            onClick={() => handleNavigation("/dashboard", "dashboard")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              activeNav === "dashboard"
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted text-muted-foreground"
-            }`}
-          >
-            <LayoutDashboard className="w-5 h-5" />
-            <span>Dashboard</span>
-          </button>
-          <button
-            onClick={() => handleNavigation("/ai-advisor", "ai")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              activeNav === "ai"
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted text-muted-foreground"
-            }`}
-          >
-            <Bot className="w-5 h-5" />
-            <span>AI Advisor</span>
-          </button>
-          <button
-            onClick={() => handleNavigation("/profile", "profile")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              activeNav === "profile"
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted text-muted-foreground"
-            }`}
-          >
-            <User className="w-5 h-5" />
-            <span>My Profile</span>
-          </button>
-          <button
-            onClick={() => handleNavigation("/alerts", "alerts")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              activeNav === "alerts"
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted text-muted-foreground"
-            }`}
-          >
-            <Bell className="w-5 h-5" />
-            <span>Alerts</span>
-            <span className="ml-auto bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full">
-              {ALERTS.length}
-            </span>
-          </button>
+        <nav className="flex-1 p-4 space-y-1">
+          <button onClick={() => handleNavigation("/dashboard", "dashboard")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeNav === "dashboard" ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"}`}><LayoutDashboard className="w-5 h-5" /><span>Dashboard</span></button>
+          <button onClick={() => handleNavigation("/ai-advisor", "ai")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeNav === "ai" ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"}`}><Bot className="w-5 h-5" /><span>AI Advisor</span></button>
+          <button onClick={() => handleNavigation("/profile", "profile")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeNav === "profile" ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"}`}><User className="w-5 h-5" /><span>My Profile</span></button>
+          <button onClick={() => handleNavigation("/alerts", "alerts")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeNav === "alerts" ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"}`}><Bell className="w-5 h-5" /><span>Alerts</span><span className="ml-auto bg-destructive/90 text-destructive-foreground text-xs px-2 py-0.5 rounded-full">{ALERTS.length}</span></button>
         </nav>
-
-        <div className="p-4 border-t border-border">
-          <div className="px-4 py-3">
-            <div className="font-medium">Riya Sharma</div>
-            <div className="text-sm text-muted-foreground">Georgia Tech</div>
-          </div>
-          <button
-            onClick={() => navigate("/")}
-            className="w-full flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground mt-2"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="text-sm">Sign Out</span>
-          </button>
+        <div className="p-4 border-t border-white/40 dark:border-white/10">
+          <div className="px-4 py-3"><div className="font-medium text-foreground">Riya Sharma</div><div className="text-sm text-muted-foreground">Georgia Tech</div></div>
+          <button onClick={() => navigate("/")} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all mt-2"><LogOut className="w-4 h-4" /><span className="text-sm">Sign Out</span></button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto p-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-semibold mb-2">Alerts & Notifications</h1>
-            <p className="text-muted-foreground">
-              Stay on top of important deadlines and compliance requirements
-            </p>
+      <main className="flex-1 overflow-y-auto min-w-0">
+        <div className="max-w-4xl mx-auto p-6 md:p-8">
+          <div className="glass bento rounded-2xl p-6 mb-6">
+            <h1 className="text-2xl font-semibold tracking-tight mb-1">Alerts & Notifications</h1>
+            <p className="text-sm text-muted-foreground">Stay on top of important deadlines and compliance requirements</p>
           </div>
 
           <div className="space-y-4">

@@ -125,25 +125,24 @@ export default function AIAdvisor() {
   };
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Sidebar */}
-      <aside className="w-64 bg-card border-r border-border flex flex-col">
-        <div className="p-6 border-b border-border">
+    <div className="flex h-screen min-h-0 overflow-hidden">
+      {/* Glass sidebar */}
+      <aside className="w-64 flex-shrink-0 flex flex-col glass bento rounded-none border-r border-white/60 dark:border-white/10 rounded-r-2xl overflow-hidden">
+        <div className="p-6 border-b border-white/40 dark:border-white/10">
           <Link to="/dashboard" className="flex items-center gap-2">
             <Shield className="w-8 h-8 text-primary" />
-            <span className="text-xl font-bold" style={{ fontFamily: "var(--font-family-heading)" }}>
+            <span className="text-xl font-bold tracking-tight" style={{ fontFamily: "var(--font-family-heading)" }}>
               UniVisa
             </span>
           </Link>
         </div>
-
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-1">
           <button
             onClick={() => handleNavigation("/dashboard", "dashboard")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
               activeNav === "dashboard"
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted text-muted-foreground"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
             }`}
           >
             <LayoutDashboard className="w-5 h-5" />
@@ -151,10 +150,10 @@ export default function AIAdvisor() {
           </button>
           <button
             onClick={() => handleNavigation("/ai-advisor", "ai")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
               activeNav === "ai"
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted text-muted-foreground"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
             }`}
           >
             <Bot className="w-5 h-5" />
@@ -162,10 +161,10 @@ export default function AIAdvisor() {
           </button>
           <button
             onClick={() => handleNavigation("/profile", "profile")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
               activeNav === "profile"
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted text-muted-foreground"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
             }`}
           >
             <User className="w-5 h-5" />
@@ -173,28 +172,27 @@ export default function AIAdvisor() {
           </button>
           <button
             onClick={() => handleNavigation("/alerts", "alerts")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
               activeNav === "alerts"
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted text-muted-foreground"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
             }`}
           >
             <Bell className="w-5 h-5" />
             <span>Alerts</span>
-            <span className="ml-auto bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full">
+            <span className="ml-auto bg-destructive/90 text-destructive-foreground text-xs px-2 py-0.5 rounded-full">
               3
             </span>
           </button>
         </nav>
-
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-white/40 dark:border-white/10">
           <div className="px-4 py-3">
-            <div className="font-medium">Riya Sharma</div>
+            <div className="font-medium text-foreground">Riya Sharma</div>
             <div className="text-sm text-muted-foreground">Georgia Tech</div>
           </div>
           <button
             onClick={() => navigate("/")}
-            className="w-full flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground mt-2"
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all mt-2"
           >
             <LogOut className="w-4 h-4" />
             <span className="text-sm">Sign Out</span>
@@ -202,33 +200,30 @@ export default function AIAdvisor() {
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col">
-        <div className="border-b border-border p-6 bg-card">
-          <h1 className="text-2xl font-semibold mb-2">AI Advisor</h1>
-          <p className="text-sm text-muted-foreground">
-            Ask me anything about F-1 visa compliance
-          </p>
+      {/* Main: glass header + scroll area + glass input */}
+      <main className="flex-1 flex flex-col min-w-0">
+        <div className="flex-shrink-0 glass border-b border-white/60 dark:border-white/10 px-6 py-5 rounded-b-2xl mx-4 mt-4 mb-0">
+          <h1 className="text-xl font-semibold tracking-tight mb-1">AI Advisor</h1>
+          <p className="text-sm text-muted-foreground">Ask me anything about F-1 visa compliance</p>
           {chatStatus && !chatStatus.ok && (
-            <div className="mt-3 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+            <div className="mt-3 p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-sm text-destructive">
               <strong>Backend not reachable.</strong> Start it from the project folder:{" "}
-              <code className="bg-muted px-1 rounded">cd univisa-backend && ./run.sh</code> — then refresh. API: {API_BASE}
+              <code className="bg-white/50 dark:bg-white/10 px-1.5 py-0.5 rounded">cd univisa-backend && ./run.sh</code> — then refresh.
             </div>
           )}
           {chatStatus?.ok && !chatStatus.gemini_configured && (
-            <div className="mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-700 dark:text-amber-400">
-              <strong>AI not configured.</strong> Add <code className="bg-muted px-1 rounded">GEMINI_API_KEY</code> to{" "}
-              <code className="bg-muted px-1 rounded">univisa-backend/.env</code> (get a key at{" "}
+            <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-sm text-amber-700 dark:text-amber-400">
+              <strong>AI not configured.</strong> Add <code className="bg-white/50 dark:bg-white/10 px-1.5 py-0.5 rounded">GEMINI_API_KEY</code> to{" "}
+              <code className="bg-white/50 dark:bg-white/10 px-1.5 py-0.5 rounded">univisa-backend/.env</code> (get a key at{" "}
               <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="underline">Google AI Studio</a>) and restart the backend.
             </div>
           )}
-          {/* Quick Questions */}
           <div className="flex flex-wrap gap-2 mt-4">
             {QUICK_QUESTIONS.map((question) => (
               <button
                 key={question}
                 onClick={() => handleSendMessage(question)}
-                className="px-3 py-1.5 rounded-full text-sm bg-secondary hover:bg-secondary/80 transition-colors"
+                className="px-4 py-2 rounded-xl text-sm bg-white/60 dark:bg-white/10 border border-white/60 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/20 transition-colors"
               >
                 {question}
               </button>
@@ -236,8 +231,7 @@ export default function AIAdvisor() {
           </div>
         </div>
 
-        {/* Chat Messages - min-h-0 lets flex child shrink so overflow-y-auto can scroll */}
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-6 bg-background">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-6">
           <div className="max-w-4xl mx-auto">
             {messages.map((msg) => (
               <ChatBubble
@@ -253,11 +247,11 @@ export default function AIAdvisor() {
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
                   <Bot className="w-5 h-5 text-primary-foreground" />
                 </div>
-                <div className="bg-card rounded-lg rounded-tl-none p-4 border border-border">
+                <div className="glass bento rounded-2xl rounded-tl-none p-4 inline-block">
                   <div className="flex gap-1">
                     <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
-                    <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce delay-100" style={{ animationDelay: "0.1s" }} />
-                    <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce delay-200" style={{ animationDelay: "0.2s" }} />
+                    <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
+                    <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
                   </div>
                 </div>
               </div>
@@ -266,19 +260,18 @@ export default function AIAdvisor() {
           </div>
         </div>
 
-        {/* Input Area */}
-        <div className="border-t border-border p-4 bg-card">
-          <div className="max-w-4xl mx-auto flex gap-2">
+        <div className="flex-shrink-0 glass border-t border-white/60 dark:border-white/10 p-4 rounded-t-2xl mx-4 mb-4">
+          <div className="max-w-4xl mx-auto flex gap-3">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
               placeholder="Ask about your visa situation..."
-              className="flex-1"
+              className="flex-1 rounded-xl border-white/60 bg-white/50 dark:bg-white/10"
             />
             <Button
               onClick={() => handleSendMessage()}
-              className="bg-primary hover:bg-primary/90"
+              className="bg-primary hover:bg-primary/90 rounded-xl px-5"
               disabled={!input.trim()}
             >
               <Send className="w-4 h-4" />
