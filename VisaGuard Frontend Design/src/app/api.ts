@@ -86,3 +86,19 @@ export async function listDsoCPTRequests(): Promise<DsoCPTRequest[]> {
   if (!res.ok) throw new Error("Failed to load CPT requests");
   return res.json();
 }
+
+/** Alert from backend (risk engine). type is "deadline" | "warning" | "info". */
+export interface Alert {
+  type: "deadline" | "warning" | "info";
+  title: string;
+  description: string;
+  severity?: string;
+  urgency?: number;
+  days_until_critical?: number | null;
+}
+
+export async function getAlerts(studentId: string): Promise<Alert[]> {
+  const res = await fetch(`${API_BASE}/student/${studentId}/alerts`);
+  if (!res.ok) throw new Error("Failed to load alerts");
+  return res.json();
+}

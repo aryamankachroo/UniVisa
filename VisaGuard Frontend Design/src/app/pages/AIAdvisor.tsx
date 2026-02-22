@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
-import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Send, Briefcase, Search } from "lucide-react";
+import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Send, Briefcase, Search, FileText } from "lucide-react";
 import { ChatBubble } from "../components/ChatBubble";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -156,6 +156,15 @@ export default function AIAdvisor() {
             <span className="ml-auto bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full">
               3
             </span>
+          </button>
+          <button
+            onClick={() => handleNavigation("/policy-alerts", "policy")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              activeNav === "policy" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"
+            }`}
+          >
+            <FileText className="w-5 h-5" />
+            <span>Policy Alerts</span>
           </button>
         </nav>
 

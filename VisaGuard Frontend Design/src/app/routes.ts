@@ -7,6 +7,7 @@ import Profile from "./pages/Profile";
 import CPT from "./pages/CPT";
 import JobOpportunities from "./pages/JobOpportunities";
 import DSODashboard from "./pages/DSODashboard";
+import PolicyAlerts from "./pages/PolicyAlerts";
 
 export const router = createBrowserRouter([
   { path: "/", Component: Onboarding },
@@ -15,6 +16,7 @@ export const router = createBrowserRouter([
   { path: "/cpt", Component: CPT },
   { path: "/opportunities", Component: JobOpportunities },
   { path: "/alerts", Component: Alerts },
+  { path: "/policy-alerts", Component: PolicyAlerts },
   { path: "/profile", Component: Profile },
   { path: "/dso", Component: DSODashboard },
 ]);

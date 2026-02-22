@@ -1,55 +1,63 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
-import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Briefcase, Search } from "lucide-react";
+import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Briefcase, Search, FileText } from "lucide-react";
 import { AlertCard } from "../components/AlertCard";
 import { motion } from "motion/react";
+import { getStudentId, getAlerts, type Alert } from "../api";
 
-const ALERTS = [
-  {
-    id: 1,
-    type: "deadline" as const,
-    title: "OPT Application Window Opens in 18 Days",
-    description: "Your OPT application window is opening soon. You must submit your application within 30 days before and up to 60 days after your program completion date. Start gathering required documents now: completed I-765 form, two passport photos, copy of I-94, copy of F-1 visa, and filing fee. Missing this window could result in losing your work authorization.",
-    timestamp: "2 hours ago",
-    urgency: 1,
-  },
-  {
-    id: 2,
-    type: "warning" as const,
-    title: "Work Hours Approaching Legal Limit",
-    description: "You're currently working 18 hours per week during the academic term. F-1 students are limited to 20 hours per week of on-campus employment during the school year. Consider reducing hours or ensuring you don't exceed this limit, as violations can result in loss of visa status.",
-    timestamp: "5 hours ago",
-    urgency: 2,
-  },
-  {
-    id: 3,
-    type: "info" as const,
-    title: "Spring Semester Enrollment Verification Due",
-    description: "Your DSO will need to verify your enrollment for Spring 2026 semester within the next 32 days. Make sure you're registered for the minimum credit hours (typically 12 credits for graduate students, 9 for undergraduates) to maintain full-time status.",
-    timestamp: "1 day ago",
-    urgency: 3,
-  },
-  {
-    id: 4,
-    type: "deadline" as const,
-    title: "SEVIS Fee Renewal Required",
-    description: "Your SEVIS I-901 fee needs to be renewed in 53 days. This fee is required to maintain your F-1 status. You can pay online through the SEVIS payment portal. Keep your payment receipt as proof of payment.",
-    timestamp: "2 days ago",
-    urgency: 4,
-  },
-  {
-    id: 5,
-    type: "info" as const,
-    title: "New USCIS Policy Update Available",
-    description: "USCIS has published updated guidance on F-1 student employment during school breaks. Review the new policy to ensure you remain compliant during summer vacation. The AI Advisor has been updated with this information.",
-    timestamp: "3 days ago",
-    urgency: 5,
-  },
+/** Fallback when backend is not available or student not found. */
+const DUMMY_ALERTS: { id: number; type: "deadline" | "warning" | "info"; title: string; description: string; timestamp: string; urgency: number }[] = [
+  { id: 1, type: "deadline", title: "OPT Application Window Opens in 18 Days", description: "Your OPT application window is opening soon. You must submit your application within 30 days before and up to 60 days after your program completion date. Start gathering required documents now: completed I-765 form, two passport photos, copy of I-94, copy of F-1 visa, and filing fee. Missing this window could result in losing your work authorization.", timestamp: "2 hours ago", urgency: 1 },
+  { id: 2, type: "warning", title: "Work Hours Approaching Legal Limit", description: "You're currently working 18 hours per week during the academic term. F-1 students are limited to 20 hours per week of on-campus employment during the school year. Consider reducing hours or ensuring you don't exceed this limit, as violations can result in loss of visa status.", timestamp: "5 hours ago", urgency: 2 },
+  { id: 3, type: "info", title: "Spring Semester Enrollment Verification Due", description: "Your DSO will need to verify your enrollment for Spring 2026 semester within the next 32 days. Make sure you're registered for the minimum credit hours (typically 12 credits for graduate students, 9 for undergraduates) to maintain full-time status.", timestamp: "1 day ago", urgency: 3 },
+  { id: 4, type: "deadline", title: "SEVIS Fee Renewal Required", description: "Your SEVIS I-901 fee needs to be renewed in 53 days. This fee is required to maintain your F-1 status. You can pay online through the SEVIS payment portal. Keep your payment receipt as proof of payment.", timestamp: "2 days ago", urgency: 4 },
+  { id: 5, type: "info", title: "New USCIS Policy Update Available", description: "USCIS has published updated guidance on F-1 student employment during school breaks. Review the new policy to ensure you remain compliant during summer vacation. The AI Advisor has been updated with this information.", timestamp: "3 days ago", urgency: 5 },
 ];
+
+function formatAlertTimestamp(alert: Alert): string {
+  const d = alert.days_until_critical;
+  if (d != null) {
+    if (d <= 0) return "Due now";
+    if (d === 1) return "In 1 day";
+    return `In ${d} days`;
+  }
+  return "Recently";
+}
 
 export default function Alerts() {
   const navigate = useNavigate();
   const [activeNav, setActiveNav] = useState("alerts");
+  const [alerts, setAlerts] = useState<{ id: string; type: "deadline" | "warning" | "info"; title: string; description: string; timestamp: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const sid = getStudentId();
+
+  useEffect(() => {
+    getAlerts(sid)
+      .then((list) => {
+        setAlerts(
+          list.map((a, i) => ({
+            id: `alert-${i}`,
+            type: a.type,
+            title: a.title,
+            description: a.description,
+            timestamp: formatAlertTimestamp(a),
+          }))
+        );
+      })
+      .catch(() => {
+        setAlerts(
+          DUMMY_ALERTS.map((a) => ({
+            id: String(a.id),
+            type: a.type,
+            title: a.title,
+            description: a.description,
+            timestamp: a.timestamp,
+          }))
+        );
+      })
+      .finally(() => setLoading(false));
+  }, [sid]);
 
   const handleNavigation = (path: string, nav: string) => {
     setActiveNav(nav);
@@ -128,8 +136,17 @@ export default function Alerts() {
             <Bell className="w-5 h-5" />
             <span>Alerts</span>
             <span className="ml-auto bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full">
-              {ALERTS.length}
+              {alerts.length}
             </span>
+          </button>
+          <button
+            onClick={() => handleNavigation("/policy-alerts", "policy")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              activeNav === "policy" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"
+            }`}
+          >
+            <FileText className="w-5 h-5" />
+            <span>Policy Alerts</span>
           </button>
         </nav>
 
@@ -158,13 +175,16 @@ export default function Alerts() {
             </p>
           </div>
 
+          {loading && (
+            <p className="text-muted-foreground mb-4">Loading alerts…</p>
+          )}
           <div className="space-y-4">
-            {ALERTS.map((alert, index) => (
+            {!loading && alerts.map((alert, index) => (
               <motion.div
                 key={alert.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
+                transition={{ delay: index * 0.05 }}
               >
                 <AlertCard
                   type={alert.type}
@@ -178,7 +198,7 @@ export default function Alerts() {
             ))}
           </div>
 
-          {ALERTS.length === 0 && (
+          {!loading && alerts.length === 0 && (
             <div className="text-center py-12">
               <Bell className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
               <h3 className="text-lg font-medium mb-2">No alerts at this time</h3>
