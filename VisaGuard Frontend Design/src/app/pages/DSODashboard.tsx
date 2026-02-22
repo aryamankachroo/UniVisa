@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { Shield, Users, TrendingUp, AlertTriangle, CheckCircle, Briefcase } from "lucide-react";
 import { listDsoCPTRequests, type DsoCPTRequest } from "../api";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { StudentRow } from "../components/StudentRow";
 import { RiskBadge } from "../components/RiskBadge";
 import { Button } from "../components/ui/button";
@@ -150,6 +151,7 @@ export default function DSODashboard() {
             <span className="ml-2 text-sm text-muted-foreground">DSO Portal</span>
           </Link>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <span className="text-sm text-muted-foreground">Georgia Tech</span>
             <Button variant="outline" size="sm" onClick={() => navigate("/")}>
               Sign Out

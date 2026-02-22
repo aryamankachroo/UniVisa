@@ -7,6 +7,7 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Slider } from "../components/ui/slider";
 import { Shield, GraduationCap, Users, ArrowRight } from "lucide-react";
+import { ThemeToggle } from "../components/ThemeToggle";
 
 const API_BASE = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "http://localhost:8000";
 const UNIVERSITIES_API = `${API_BASE}/universities`;
@@ -91,7 +92,10 @@ export default function Onboarding() {
 
   if (showRoleSelection) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
+        <div className="fixed top-4 right-4 z-10">
+          <ThemeToggle />
+        </div>
         <div className="w-full max-w-4xl">
           {/* Logo and Title */}
           <div className="text-center mb-12">
@@ -157,7 +161,10 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
+      <div className="fixed top-4 right-4 z-10">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-2xl">
         {/* Logo and Title */}
         <div className="text-center mb-8">

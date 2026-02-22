@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Briefcase, Plus, Search, FileText } from "lucide-react";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -18,11 +19,12 @@ function Sidebar({ activeNav, onNav }: { activeNav: string; onNav: (path: string
   const navigate = useNavigate();
   return (
     <aside className="w-64 bg-card border-r border-border flex flex-col">
-      <div className="p-6 border-b border-border">
-        <Link to="/" className="flex items-center gap-2">
-          <Shield className="w-8 h-8 text-primary" />
-          <span className="text-xl font-bold" style={{ fontFamily: "var(--font-family-heading)" }}>UniVisa</span>
+      <div className="p-6 border-b border-border flex items-center justify-between gap-2">
+        <Link to="/" className="flex items-center gap-2 min-w-0">
+          <Shield className="w-8 h-8 text-primary shrink-0" />
+          <span className="text-xl font-bold truncate" style={{ fontFamily: "var(--font-family-heading)" }}>UniVisa</span>
         </Link>
+        <ThemeToggle />
       </div>
       <nav className="flex-1 p-4 space-y-2">
         {[
