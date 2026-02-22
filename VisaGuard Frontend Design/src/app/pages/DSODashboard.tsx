@@ -6,8 +6,29 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { StudentRow } from "../components/StudentRow";
 import { RiskBadge } from "../components/RiskBadge";
 import { Button } from "../components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 import { motion } from "motion/react";
 import { toast } from "sonner";
+
+const SCHEDULE_TIME_SLOTS = [
+  "8:00 AM", "8:30 AM", "9:00 AM", "9:30 AM", "10:00 AM", "10:30 AM",
+  "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM", "1:00 PM", "1:30 PM",
+  "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM", "4:00 PM", "4:30 PM", "5:00 PM",
+];
 
 const STUDENTS_DATA = [
   {
@@ -125,6 +146,9 @@ export default function DSODashboard() {
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<"riskScore" | "name">("riskScore");
   const [cptRequests, setCptRequests] = useState<DsoCPTRequest[]>([]);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
 
   useEffect(() => {
     listDsoCPTRequests().then(setCptRequests).catch(() => {});
@@ -391,7 +415,12 @@ export default function DSODashboard() {
                   >
                     Notify Student
                   </Button>
-                  <Button variant="outline" className="w-full">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setScheduleDialogOpen(true)}
+                  >
                     Schedule Meeting
                   </Button>
                 </div>
@@ -400,6 +429,75 @@ export default function DSODashboard() {
           </div>
         </div>
       </main>
+
+      <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Schedule Meeting</DialogTitle>
+            <DialogDescription>
+              Choose a date and time for the meeting with{" "}
+              {selectedStudentData?.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Date</label>
+              <input
+                type="date"
+                value={scheduleDate}
+                onChange={(e) => setScheduleDate(e.target.value)}
+                min={new Date().toISOString().slice(0, 10)}
+                className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Time</label>
+              <Select value={scheduleTime} onValueChange={setScheduleTime}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select time" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SCHEDULE_TIME_SLOTS.map((slot) => (
+                    <SelectItem key={slot} value={slot}>
+                      {slot}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setScheduleDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (!scheduleDate || !scheduleTime) {
+                  toast.error("Please select both date and time.");
+                  return;
+                }
+                const dateStr = new Date(scheduleDate + "T12:00:00").toLocaleDateString("en-US", {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                });
+                toast.success(`Meeting scheduled for ${dateStr} at ${scheduleTime}.`);
+                setScheduleDialogOpen(false);
+                setScheduleDate("");
+                setScheduleTime("");
+              }}
+            >
+              Schedule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
