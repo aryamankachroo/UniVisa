@@ -222,4 +222,16 @@
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
   }
+
+  /* Date inputs: move calendar icon to the right */
+  input[type="date"] {
+    position: relative;
+    padding-inline-end: 2.5rem;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    position: absolute;
+    right: 0.5rem;
+    cursor: pointer;
+    opacity: 0.8;
+  }
 }
