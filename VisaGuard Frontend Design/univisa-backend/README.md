@@ -11,7 +11,7 @@ python -m venv .venv
 # source .venv/bin/activate  # macOS/Linux
 pip install -r requirements.txt
 copy .env.example .env   # Windows (use cp on macOS/Linux)
-# Edit .env: add ANTHROPIC_API_KEY (required for AI chat), optional Reddit/Actian keys
+# Edit .env: add GEMINI_API_KEY (required for AI chat), optional Reddit/Actian keys
 ```
 
 **Run without venv (system Python):**
@@ -28,14 +28,34 @@ Or double‑click `run-without-venv.bat` (or run `.\run-without-venv.ps1` in Pow
 
 ## Run API
 
+**Quick run (macOS/Linux):**
 ```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+cd univisa-backend
+chmod +x run.sh
+./run.sh
+```
+
+**Or manually:**
+```bash
+cd univisa-backend
+source .venv/bin/activate   # macOS/Linux
+uvicorn main:app --reload --port 8000
 ```
 
 - API: http://localhost:8000  
 - Docs: http://localhost:8000/docs  
 
-CORS is enabled for `http://localhost:3000` (React frontend).
+CORS allows `http://localhost:5173` and `http://127.0.0.1:5173` (Vite frontend).
+
+### Backend / chatbot "not working"?
+
+The **AI Advisor** page shows a banner if the backend is unreachable or if the AI key is missing — fix what it says, then refresh.
+
+1. **"Address already in use"** — Something is using port 8000. Run: `lsof -ti :8000 | xargs kill -9` then start again.
+2. **"Backend not reachable"** — Start the backend first: `cd univisa-backend && ./run.sh` (or `source .venv/bin/activate && uvicorn main:app --reload --port 8000`). Then refresh the frontend.
+3. **"AI not configured"** — Add `GEMINI_API_KEY` to `univisa-backend/.env` (get a key at https://aistudio.google.com/app/apikey) and restart the backend.
+4. **Wrong directory** — Run uvicorn from inside `univisa-backend` (where `main.py` is).
+5. **Venv not activated** — Run `source .venv/bin/activate` (macOS/Linux) so `uvicorn` and dependencies are found.
 
 ## Demo Student
 
