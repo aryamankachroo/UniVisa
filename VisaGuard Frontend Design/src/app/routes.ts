@@ -5,6 +5,7 @@ import AIAdvisor from "./pages/AIAdvisor";
 import Alerts from "./pages/Alerts";
 import Profile from "./pages/Profile";
 import CPT from "./pages/CPT";
+import JobOpportunities from "./pages/JobOpportunities";
 import DSODashboard from "./pages/DSODashboard";
 
 export const router = createBrowserRouter([
@@ -12,6 +13,7 @@ export const router = createBrowserRouter([
   { path: "/dashboard", Component: Dashboard },
   { path: "/ai-advisor", Component: AIAdvisor },
   { path: "/cpt", Component: CPT },
+  { path: "/opportunities", Component: JobOpportunities },
   { path: "/alerts", Component: Alerts },
   { path: "/profile", Component: Profile },
   { path: "/dso", Component: DSODashboard },

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
-import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Send, Briefcase } from "lucide-react";
+import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Send, Briefcase, Search } from "lucide-react";
 import { ChatBubble } from "../components/ChatBubble";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -124,6 +124,13 @@ export default function AIAdvisor() {
           >
             <Briefcase className="w-5 h-5" />
             <span>CPT / Internship</span>
+          </button>
+          <button
+            onClick={() => handleNavigation("/opportunities", "opportunities")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeNav === "opportunities" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
+          >
+            <Search className="w-5 h-5" />
+            <span>Opportunities</span>
           </button>
           <button
             onClick={() => handleNavigation("/profile", "profile")}

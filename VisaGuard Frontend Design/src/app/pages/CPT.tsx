@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
-import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Briefcase, Plus } from "lucide-react";
+import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Briefcase, Plus, Search } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -29,6 +29,7 @@ function Sidebar({ activeNav, onNav }: { activeNav: string; onNav: (path: string
           ["/dashboard", "dashboard", LayoutDashboard, "Dashboard"],
           ["/ai-advisor", "ai", Bot, "AI Advisor"],
           ["/cpt", "cpt", Briefcase, "CPT / Internship"],
+          ["/opportunities", "opportunities", Search, "Opportunities"],
           ["/profile", "profile", User, "My Profile"],
           ["/alerts", "alerts", Bell, "Alerts"],
         ].map(([path, nav, Icon, label]) => (
