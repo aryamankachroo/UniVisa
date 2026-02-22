@@ -4,11 +4,7 @@ import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Send } from "lucide-r
 import { ChatBubble } from "../components/ChatBubble";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-<<<<<<< HEAD
 import { getAnswer } from "../UniVisaAdvisor";
-=======
-import { API_BASE, getStudentId } from "../lib/api";
->>>>>>> 1abb0c8bfb04afefa68e7508e3210330250d88cc
 
 interface Message {
   id: number;
@@ -42,7 +38,6 @@ export default function AIAdvisor() {
   const [chatError, setChatError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const nextIdRef = useRef(2);
-  const [chatStatus, setChatStatus] = useState<{ ok: boolean; gemini_configured: boolean } | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -52,25 +47,11 @@ export default function AIAdvisor() {
     scrollToBottom();
   }, [messages]);
 
-<<<<<<< HEAD
   const handleSendMessage = async (messageText?: string) => {
     const text = (messageText || input).trim();
     if (!text) return;
 
-=======
-  useEffect(() => {
-    fetch(`${API_BASE}/chat/status`)
-      .then((r) => r.json())
-      .then((data) => setChatStatus({ ok: true, gemini_configured: !!data?.gemini_configured }))
-      .catch(() => setChatStatus({ ok: false, gemini_configured: false }));
-  }, []);
-
-  const handleSendMessage = async (messageText?: string) => {
-    const text = messageText || input;
-    if (!text.trim()) return;
-
     const userMsgId = nextIdRef.current++;
->>>>>>> 1abb0c8bfb04afefa68e7508e3210330250d88cc
     const userMessage: Message = {
       id: userMsgId,
       message: text,
@@ -82,68 +63,18 @@ export default function AIAdvisor() {
     setChatError(null);
     setIsTyping(true);
 
-<<<<<<< HEAD
-    // Answer from hardcoded UniVisaAdvisor Q&A (no API call)
+    const aiMsgId = nextIdRef.current++;
     setTimeout(() => {
       const answer = getAnswer(text);
-      const aiMessage: Message = {
-        id: messages.length + 2,
-        message: answer,
-        isAI: true,
-=======
-    const aiMsgId = nextIdRef.current++;
-
-    try {
-      const studentId = getStudentId();
-      const res = await fetch(`${API_BASE}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ student_id: studentId, question: text }),
-      });
-      const data = await res.json().catch(() => ({}));
-      let answer: string;
-      if (res.ok) {
-        const raw = data.answer;
-        answer =
-          typeof raw === "string" && raw.trim() !== ""
-            ? raw.trim()
-            : "No response.";
-      } else {
-        const detail = data.detail;
-        if (typeof detail === "string") answer = detail;
-        else if (Array.isArray(detail) && detail[0]?.msg) answer = detail.map((d: { msg?: string }) => d.msg).join(". ");
-        else answer = "Could not reach the server. Is the backend running at " + API_BASE + "?";
-      }
-      const source =
-        res.ok && Array.isArray(data.sources) && data.sources.length > 0
-          ? data.sources.join(", ")
-          : undefined;
       const aiMessage: Message = {
         id: aiMsgId,
         message: answer,
         isAI: true,
-        source,
->>>>>>> 1abb0c8bfb04afefa68e7508e3210330250d88cc
         timestamp: "Just now",
       };
       setMessages((prev) => [...prev, aiMessage]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: aiMsgId,
-          message: "Could not reach the server at " + API_BASE + ". Make sure the backend is running.",
-          isAI: true,
-          timestamp: "Just now",
-        },
-      ]);
-    } finally {
       setIsTyping(false);
-<<<<<<< HEAD
     }, 900);
-=======
-    }
->>>>>>> 1abb0c8bfb04afefa68e7508e3210330250d88cc
   };
 
   const handleNavigation = (path: string, nav: string) => {
@@ -236,23 +167,8 @@ export default function AIAdvisor() {
           <p className="text-sm text-muted-foreground">
             Ask me anything about F-1 visa compliance (answers from UniVisa Q&A)
           </p>
-<<<<<<< HEAD
           {chatError && (
             <p className="mt-2 text-sm text-destructive">{chatError}</p>
-=======
-          {chatStatus && !chatStatus.ok && (
-            <div className="mt-3 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
-              <strong>Backend not reachable.</strong> Start it from the project folder:{" "}
-              <code className="bg-muted px-1 rounded">cd univisa-backend && ./run.sh</code> — then refresh. API: {API_BASE}
-            </div>
-          )}
-          {chatStatus?.ok && !chatStatus.gemini_configured && (
-            <div className="mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-700 dark:text-amber-400">
-              <strong>AI not configured.</strong> Add <code className="bg-muted px-1 rounded">GEMINI_API_KEY</code> to{" "}
-              <code className="bg-muted px-1 rounded">univisa-backend/.env</code> (get a key at{" "}
-              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="underline">Google AI Studio</a>) and restart the backend.
-            </div>
->>>>>>> 1abb0c8bfb04afefa68e7508e3210330250d88cc
           )}
           {/* Quick Questions */}
           <div className="flex flex-wrap gap-2 mt-4">

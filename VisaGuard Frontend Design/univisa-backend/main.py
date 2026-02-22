@@ -8,18 +8,14 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from dotenv import load_dotenv
-load_dotenv()
-
-from fastapi import FastAPI
-
-# Load .env from backend directory so API keys are always found (no matter where you run from)
 _env_path = Path(__file__).resolve().parent / ".env"
 load_dotenv(dotenv_path=_env_path)
+
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from models.student import StudentProfile, VisaType, EnrollmentStatus
-from routers import student, chat, dso
+from routers import student, chat, dso, cpt
 
 app = FastAPI(
     title="UniVisa API",
@@ -29,20 +25,18 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-<<<<<<< HEAD
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:5174",
         "http://localhost:5175",
+        "http://localhost:5176",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
         "http://127.0.0.1:5175",
+        "http://127.0.0.1:5176",
     ],
-=======
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173"],
->>>>>>> 1abb0c8bfb04afefa68e7508e3210330250d88cc
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -51,6 +45,7 @@ app.add_middleware(
 app.include_router(student.router)
 app.include_router(chat.router)
 app.include_router(dso.router)
+app.include_router(cpt.router)
 
 
 def _seed_demo_student() -> None:
@@ -91,7 +86,6 @@ def root() -> dict:
     return {"message": "UniVisa API", "docs": "/docs"}
 
 
-<<<<<<< HEAD
 @app.get("/universities")
 def get_universities() -> list[str]:
     """Proxy Hipo Labs API to avoid CORS; returns sorted, deduplicated US university names."""
@@ -103,10 +97,3 @@ def get_universities() -> list[str]:
         return []
     names = sorted({u["name"] for u in data if isinstance(u.get("name"), str)})
     return names
-=======
-@app.get("/chat/status")
-def chat_status() -> dict:
-    """Check if Gemini API is configured (for debugging). Does not reveal keys."""
-    import os
-    return {"ok": True, "gemini_configured": bool(os.getenv("GEMINI_API_KEY", "").strip())}
->>>>>>> 1abb0c8bfb04afefa68e7508e3210330250d88cc
