@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
-import { Shield, Users, TrendingUp, AlertTriangle, CheckCircle } from "lucide-react";
+import { Shield, Users, TrendingUp, AlertTriangle, CheckCircle, Briefcase } from "lucide-react";
+import { listDsoCPTRequests, type DsoCPTRequest } from "../api";
 import { StudentRow } from "../components/StudentRow";
 import { RiskBadge } from "../components/RiskBadge";
 import { Button } from "../components/ui/button";
@@ -115,10 +116,17 @@ const SUMMARY_STATS = {
   compliant: 668,
 };
 
+const CPT_STATUS: Record<string, string> = { intent: "Early alert (no offer yet)", offer_signed: "Offer signed — pending", approved: "Approved", rejected: "Rejected" };
+
 export default function DSODashboard() {
   const navigate = useNavigate();
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<"riskScore" | "name">("riskScore");
+  const [cptRequests, setCptRequests] = useState<DsoCPTRequest[]>([]);
+
+  useEffect(() => {
+    listDsoCPTRequests().then(setCptRequests).catch(() => {});
+  }, []);
 
   const sortedStudents = [...STUDENTS_DATA].sort((a, b) => {
     if (sortBy === "riskScore") {
@@ -217,6 +225,46 @@ export default function DSODashboard() {
             <div className="text-sm text-muted-foreground">Compliant</div>
           </motion.div>
         </div>
+
+        {cptRequests.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-card border border-border rounded-lg p-6 mb-8">
+            <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
+              <Briefcase className="w-5 h-5 text-primary" />
+              CPT requests (early visibility)
+            </h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Students who started CPT before signing their offer — prepare approval so it’s faster when they upload the signed offer.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-muted-foreground">
+                    <th className="pb-2 pr-4">Student</th>
+                    <th className="pb-2 pr-4">Company</th>
+                    <th className="pb-2 pr-4">Role</th>
+                    <th className="pb-2 pr-4">Start – End</th>
+                    <th className="pb-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cptRequests.map((r) => (
+                    <tr key={r.id} className="border-b border-border/50">
+                      <td className="py-3 pr-4 font-medium">{r.student_name}</td>
+                      <td className="py-3 pr-4">{r.company_name}</td>
+                      <td className="py-3 pr-4">{r.role}</td>
+                      <td className="py-3 pr-4">{r.expected_start_date} – {r.expected_end_date}</td>
+                      <td className="py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded ${r.status === "intent" ? "bg-primary/20 text-primary" : r.status === "offer_signed" ? "bg-amber-500/20 text-amber-600" : r.status === "approved" ? "bg-green-500/20 text-green-600" : "bg-muted text-muted-foreground"}`}>
+                          {CPT_STATUS[r.status] ?? r.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
 
         {/* Student Table */}
         <div className="bg-card border border-border rounded-lg overflow-hidden">

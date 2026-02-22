@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Shield, LayoutDashboard, Bot, User, Bell, LogOut } from "lucide-react";
+import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Briefcase } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -49,6 +49,13 @@ export default function Profile() {
           >
             <Bot className="w-5 h-5" />
             <span>AI Advisor</span>
+          </button>
+          <button
+            onClick={() => handleNavigation("/cpt", "cpt")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeNav === "cpt" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
+          >
+            <Briefcase className="w-5 h-5" />
+            <span>CPT / Internship</span>
           </button>
           <button
             onClick={() => handleNavigation("/profile", "profile")}
