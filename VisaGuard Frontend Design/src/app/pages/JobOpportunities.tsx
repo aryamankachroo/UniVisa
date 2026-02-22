@@ -45,7 +45,7 @@ function Sidebar({ activeNav, onNav }: { activeNav: string; onNav: (path: string
   return (
     <aside className="w-64 bg-card border-r border-border flex flex-col">
       <div className="p-6 border-b border-border">
-        <Link to="/dashboard" className="flex items-center gap-2">
+        <Link to="/" className="flex items-center gap-2">
           <Shield className="w-8 h-8 text-primary" />
           <span className="text-xl font-bold" style={{ fontFamily: "var(--font-family-heading)" }}>UniVisa</span>
         </Link>
