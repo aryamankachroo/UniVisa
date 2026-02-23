@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { Button } from "../components/ui/button";
@@ -6,24 +6,36 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Slider } from "../components/ui/slider";
-import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "../components/ui/command";
-import { Shield, GraduationCap, Users, ArrowRight, ChevronDownIcon, CheckIcon } from "lucide-react";
-import { cn } from "../components/ui/utils";
-import { UNIVERSITIES } from "../data/universities";
+import { Shield, GraduationCap, Users, ArrowRight } from "lucide-react";
+import { ThemeToggle } from "../components/ThemeToggle";
+
+const API_BASE = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "http://localhost:8000";
+const UNIVERSITIES_API = `${API_BASE}/universities`;
+
+const COUNTRIES = [
+  "Afghanistan", "Albania", "Algeria", "Argentina", "Australia", "Austria", "Bangladesh", "Belgium", "Brazil", "Bulgaria",
+  "Canada", "Chile", "China", "Colombia", "Costa Rica", "Croatia", "Czech Republic", "Denmark", "Egypt", "Estonia",
+  "Finland", "France", "Germany", "Ghana", "Greece", "Hong Kong", "Hungary", "Iceland", "India", "Indonesia",
+  "Iran", "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya",
+  "South Korea", "Kuwait", "Lebanon", "Malaysia", "Mexico", "Morocco", "Netherlands", "New Zealand", "Nigeria", "Norway",
+  "Pakistan", "Peru", "Philippines", "Poland", "Portugal", "Romania", "Russia", "Saudi Arabia", "Singapore", "South Africa",
+  "Spain", "Sri Lanka", "Sweden", "Switzerland", "Taiwan", "Thailand", "Turkey", "Ukraine", "United Arab Emirates", "United Kingdom",
+  "United States", "Venezuela", "Vietnam", "Other",
+];
+
+const TOP_UNIVERSITIES = [
+  "Georgia Institute of Technology",
+  "MIT",
+  "Stanford University",
+  "UC Berkeley",
+  "Carnegie Mellon University",
+];
 
 interface FormData {
   fullName: string;
   university: string;
   country: string;
-  visaType: "F-1" | "J-1";
+  visaType: "F-1" | "J-1" | "";
   programStart: string;
   programEnd: string;
   enrollmentStatus: string;
@@ -45,7 +57,7 @@ export default function Onboarding() {
     fullName: "",
     university: "",
     country: "",
-    visaType: "F-1",
+    visaType: "",
     programStart: "",
     programEnd: "",
     enrollmentStatus: "Full-time",
@@ -57,6 +69,26 @@ export default function Onboarding() {
     changeEmployer: false,
     courseChanges: false,
   });
+
+  const [universities, setUniversities] = useState<string[]>(TOP_UNIVERSITIES);
+  const [universitiesLoading, setUniversitiesLoading] = useState(false);
+  const [universitiesError, setUniversitiesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(UNIVERSITIES_API)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load");
+        return res.json();
+      })
+      .then((names: string[]) => {
+        if (Array.isArray(names) && names.length > 0) {
+          setUniversities(names);
+        }
+      })
+      .catch(() => {
+        // Keep TOP_UNIVERSITIES as fallback; no error message so dropdown stays usable
+      });
+  }, []);
 
   const updateField = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -72,7 +104,10 @@ export default function Onboarding() {
 
   if (showRoleSelection) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
+        <div className="fixed top-4 right-4 z-10">
+          <ThemeToggle />
+        </div>
         <div className="w-full max-w-4xl">
           {/* Logo and Title */}
           <div className="text-center mb-12">
@@ -138,7 +173,10 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
+      <div className="fixed top-4 right-4 z-10">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-2xl">
         {/* Logo and Title */}
         <div className="text-center mb-8">
@@ -186,7 +224,7 @@ export default function Onboarding() {
                   <Label htmlFor="fullName">Full Name</Label>
                   <Input
                     id="fullName"
-                    placeholder="Riya Sharma"
+                    placeholder="Enter your full name"
                     value={formData.fullName}
                     onChange={(e) => updateField("fullName", e.target.value)}
                     className="mt-1.5"
@@ -195,55 +233,23 @@ export default function Onboarding() {
 
                 <div>
                   <Label htmlFor="university">University Name</Label>
-                  <Popover open={universityOpen} onOpenChange={setUniversityOpen}>
-                    <PopoverTrigger asChild>
-                      <button
-                        type="button"
-                        id="university"
-                        aria-expanded={universityOpen}
-                        aria-haspopup="listbox"
-                        aria-label="Select university"
-                        aria-controls="university-listbox"
-                        className={cn(
-                          "mt-1.5 flex h-9 w-full items-center justify-between rounded-md border border-input bg-input-background px-3 py-2 text-sm text-left transition-colors",
-                          "hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-                          !formData.university && "text-muted-foreground"
-                        )}
-                      >
-                        <span className="truncate">
-                          {formData.university || "Select your university"}
-                        </span>
-                        <ChevronDownIcon className="h-4 w-4 shrink-0 opacity-50" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search university..." />
-                        <CommandList id="university-listbox" role="listbox">
-                          <CommandEmpty>No university found.</CommandEmpty>
-                          <CommandGroup>
-                            {UNIVERSITIES.map((uni) => (
-                              <CommandItem
-                                key={uni.name}
-                                value={uni.name}
-                                keywords={uni.keywords}
-                                onSelect={() => {
-                                  updateField("university", uni.name);
-                                  setUniversityOpen(false);
-                                }}
-                                className="flex items-center justify-between gap-2"
-                              >
-                                <span>{uni.name}</span>
-                                {formData.university === uni.name ? (
-                                  <CheckIcon className="h-4 w-4 shrink-0 text-primary" />
-                                ) : null}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <Select
+                    value={formData.university}
+                    onValueChange={(value) => updateField("university", value)}
+                    disabled={universitiesLoading}
+                  >
+                    <SelectTrigger className="mt-1.5">
+                      <SelectValue placeholder="Select your university" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {universities.map((name) => (
+                        <SelectItem key={name} value={name}>
+                          {name}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
@@ -256,13 +262,11 @@ export default function Onboarding() {
                       <SelectValue placeholder="Select your country" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="India">India</SelectItem>
-                      <SelectItem value="China">China</SelectItem>
-                      <SelectItem value="South Korea">South Korea</SelectItem>
-                      <SelectItem value="Canada">Canada</SelectItem>
-                      <SelectItem value="Mexico">Mexico</SelectItem>
-                      <SelectItem value="Brazil">Brazil</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
+                      {COUNTRIES.map((country) => (
+                        <SelectItem key={country} value={country}>
+                          {country}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -276,7 +280,7 @@ export default function Onboarding() {
                       className={`p-4 rounded-lg border-2 transition-all ${
                         formData.visaType === "F-1"
                           ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
+                          : "border-border bg-transparent hover:border-primary/50"
                       }`}
                     >
                       <div className="font-semibold mb-1">F-1 Visa</div>
@@ -290,7 +294,7 @@ export default function Onboarding() {
                       className={`p-4 rounded-lg border-2 transition-all ${
                         formData.visaType === "J-1"
                           ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
+                          : "border-border bg-transparent hover:border-primary/50"
                       }`}
                     >
                       <div className="font-semibold mb-1">J-1 Visa</div>

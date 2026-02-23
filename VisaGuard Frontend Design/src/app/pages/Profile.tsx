@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Shield, LayoutDashboard, Bot, User, Bell, LogOut } from "lucide-react";
+import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Briefcase, Search, FileText } from "lucide-react";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -15,19 +16,90 @@ export default function Profile() {
   };
 
   return (
-    <div className="flex h-screen min-h-0 overflow-hidden">
-      <aside className="w-64 flex-shrink-0 flex flex-col glass bento rounded-none border-r border-white/60 dark:border-white/10 rounded-r-2xl overflow-hidden">
-        <div className="p-6 border-b border-white/40 dark:border-white/10">
-          <Link to="/dashboard" className="flex items-center gap-2">
-            <Shield className="w-8 h-8 text-primary" />
-            <span className="text-xl font-bold tracking-tight" style={{ fontFamily: "var(--font-family-heading)" }}>UniVisa</span>
+    <div className="flex h-screen bg-background">
+      {/* Sidebar */}
+      <aside className="w-64 bg-card border-r border-border flex flex-col">
+        <div className="p-6 border-b border-border flex items-center justify-between gap-2">
+          <Link to="/" className="flex items-center gap-2 min-w-0">
+            <Shield className="w-8 h-8 text-primary shrink-0" />
+            <span className="text-xl font-bold truncate" style={{ fontFamily: "var(--font-family-heading)" }}>
+              UniVisa
+            </span>
           </Link>
+          <ThemeToggle />
         </div>
-        <nav className="flex-1 p-4 space-y-1">
-          <button onClick={() => handleNavigation("/dashboard", "dashboard")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeNav === "dashboard" ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"}`}><LayoutDashboard className="w-5 h-5" /><span>Dashboard</span></button>
-          <button onClick={() => handleNavigation("/ai-advisor", "ai")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeNav === "ai" ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"}`}><Bot className="w-5 h-5" /><span>AI Advisor</span></button>
-          <button onClick={() => handleNavigation("/profile", "profile")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeNav === "profile" ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"}`}><User className="w-5 h-5" /><span>My Profile</span></button>
-          <button onClick={() => handleNavigation("/alerts", "alerts")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeNav === "alerts" ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"}`}><Bell className="w-5 h-5" /><span>Alerts</span><span className="ml-auto bg-destructive/90 text-destructive-foreground text-xs px-2 py-0.5 rounded-full">3</span></button>
+
+        <nav className="flex-1 p-4 space-y-2">
+          <button
+            onClick={() => handleNavigation("/dashboard", "dashboard")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              activeNav === "dashboard"
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted text-muted-foreground"
+            }`}
+          >
+            <LayoutDashboard className="w-5 h-5" />
+            <span>Dashboard</span>
+          </button>
+          <button
+            onClick={() => handleNavigation("/ai-advisor", "ai")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              activeNav === "ai"
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted text-muted-foreground"
+            }`}
+          >
+            <Bot className="w-5 h-5" />
+            <span>AI Advisor</span>
+          </button>
+          <button
+            onClick={() => handleNavigation("/cpt", "cpt")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeNav === "cpt" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
+          >
+            <Briefcase className="w-5 h-5" />
+            <span>CPT / Internship</span>
+          </button>
+          <button
+            onClick={() => handleNavigation("/opportunities", "opportunities")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeNav === "opportunities" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
+          >
+            <Search className="w-5 h-5" />
+            <span>Opportunities</span>
+          </button>
+          <button
+            onClick={() => handleNavigation("/profile", "profile")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              activeNav === "profile"
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted text-muted-foreground"
+            }`}
+          >
+            <User className="w-5 h-5" />
+            <span>My Profile</span>
+          </button>
+          <button
+            onClick={() => handleNavigation("/alerts", "alerts")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              activeNav === "alerts"
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted text-muted-foreground"
+            }`}
+          >
+            <Bell className="w-5 h-5" />
+            <span>Alerts</span>
+            <span className="ml-auto bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full">
+              3
+            </span>
+          </button>
+          <button
+            onClick={() => handleNavigation("/policy-alerts", "policy")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              activeNav === "policy" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"
+            }`}
+          >
+            <FileText className="w-5 h-5" />
+            <span>Policy Alerts</span>
+          </button>
         </nav>
         <div className="p-4 border-t border-white/40 dark:border-white/10">
           <div className="px-4 py-3"><div className="font-medium text-foreground">Riya Sharma</div><div className="text-sm text-muted-foreground">Georgia Tech</div></div>

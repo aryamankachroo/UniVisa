@@ -8,8 +8,15 @@ python-dotenv==1.0.1
 pydantic==2.10.3
 pydantic-settings==2.6.1
 
+<<<<<<< HEAD
+# AI & Embeddings
+anthropic==0.39.0
+google-generativeai>=0.8.0
+sentence-transformers==3.3.1
+=======
 # AI chat: direct REST API (no SDK model list issues)
 # google-generativeai optional; we use REST as primary
+>>>>>>> 1abb0c8bfb04afefa68e7508e3210330250d88cc
 
 # Vector store (RAG) - ChromaDB by default; set ACTIAN_VECTORAI_URL + install actiancortex for Actian VectorAI DB
 chromadb==0.5.23

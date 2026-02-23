@@ -1,4 +1,8 @@
+<<<<<<< HEAD
+"""RAG pipeline: embed query -> vector search -> LLM (Gemini 2.5 Flash preferred, fallback Claude) with context.
+=======
 """RAG pipeline: embed query -> vector search -> Gemini with context.
+>>>>>>> 1abb0c8bfb04afefa68e7508e3210330250d88cc
 Uses Actian VectorAI DB when ACTIAN_VECTORAI_URL is set (see github.com/hackmamba-io/actian-vectorAI-db-beta),
 otherwise ChromaDB (data/chroma_db/).
 """
@@ -144,6 +148,75 @@ def _vector_search(embedding: list[float], top_k: int = 5) -> list[dict]:
 # Chat: Gemini API only.
 CHAT_SYSTEM_PROMPT = """You are UniVisa's AI advisor for F-1 and J-1 international students in the US. Answer the student's question clearly and specifically. Give a direct answer in your first 1-2 sentences (e.g. "Yes, F-1 students may work up to 20 hours per week on campus" or "Missing the CPT deadline can mean you're not authorized to work—contact your DSO immediately."). Do not reply with only "consult your DSO." Add a brief note at the end: "For your situation, confirm with your DSO." Use plain English. Student profile: {student_context}"""
 
+<<<<<<< HEAD
+    context = (
+        "\n\n".join(f"[{chunk['source']}]\n{chunk['text']}" for chunk in relevant_chunks)
+        if relevant_chunks
+        else "(No policy documents have been ingested yet. Answer from your knowledge of F-1/J-1 rules and recommend the student confirm with their DSO for official guidance.)"
+    )
+    student_context = f"""
+    University: {student_profile.university}
+    Visa: {student_profile.visa_type.value}
+    Program ends: {student_profile.program_end_date}
+    Enrollment: {student_profile.enrollment_status.value}
+    On OPT: {student_profile.on_opt}
+    Weekly work hours: {student_profile.weekly_work_hours}
+    """
+    # Prefer Gemini 2.5 Flash (GOOGLE_API_KEY or GEMINI_API_KEY), fallback to Anthropic
+    gemini_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY") or os.getenv("gemini_api_key")
+    if gemini_key:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=gemini_key.strip())
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            full_prompt = (
+                SYSTEM_PROMPT.format(student_context=student_context)
+                + "\n\nContext:\n"
+                + context
+                + "\n\nQuestion: "
+                + question
+            )
+            response = model.generate_content(full_prompt)
+            text = response.text if response.text else ""
+            return {
+                "answer": text,
+                "sources": [chunk["source"] for chunk in relevant_chunks],
+            }
+        except Exception as e:
+            return {
+                "answer": f"Sorry, the AI advisor encountered an error. Please try again or contact your DSO. Error: {e!s}",
+                "sources": [chunk["source"] for chunk in relevant_chunks],
+            }
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        return {
+            "answer": "AI advisor is not configured (set GOOGLE_API_KEY or GEMINI_API_KEY in .env). Please contact your DSO for visa compliance questions.",
+            "sources": [chunk["source"] for chunk in relevant_chunks],
+        }
+    try:
+        import anthropic
+        client = anthropic.Anthropic()
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1024,
+            system=SYSTEM_PROMPT.format(student_context=student_context),
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"Context:\n{context}\n\nQuestion: {question}",
+                }
+            ],
+        )
+        text = response.content[0].text if response.content else ""
+        return {
+            "answer": text,
+            "sources": [chunk["source"] for chunk in relevant_chunks],
+        }
+    except Exception as e:
+        return {
+            "answer": f"Sorry, the AI advisor encountered an error. Please try again or contact your DSO. Error: {e!s}",
+            "sources": [chunk["source"] for chunk in relevant_chunks],
+=======
 
 def _call_gemini_rest(question: str, system_prompt: str, api_key: str) -> dict:
     """Call Gemini via REST API. Returns {answer, sources}. Works with any valid API key."""
@@ -204,5 +277,6 @@ def query_rag(question: str, student_profile: StudentProfile) -> dict:
         return {
             "answer": "Add GEMINI_API_KEY to .env (get a key at https://aistudio.google.com/app/apikey) and restart the backend.",
             "sources": [],
+>>>>>>> 1abb0c8bfb04afefa68e7508e3210330250d88cc
         }
     return _call_gemini_rest(question.strip(), system_prompt, api_key)

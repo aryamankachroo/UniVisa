@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
-import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Send } from "lucide-react";
+import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Send, Briefcase, Search, FileText } from "lucide-react";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { ChatBubble } from "../components/ChatBubble";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { API_BASE, getStudentId } from "../lib/api";
+import { getAnswer } from "../UniVisaAdvisor";
 
 interface Message {
   id: number;
@@ -17,7 +18,7 @@ interface Message {
 const INITIAL_MESSAGES: Message[] = [
   {
     id: 1,
-    message: "Hi Riya! I'm your UniVisa AI advisor. I'm here to help you navigate F-1 visa compliance. I can answer questions about work authorization, travel, OPT/CPT, and more. All my responses are grounded in official USCIS policy documents.",
+    message: "Hi! I'm your UniVisa AI advisor. I'm here to help with F-1/J-1 visa compliance. Ask me about work authorization, travel, OPT/CPT, address reporting, or anything else — I'll answer from our policy Q&A.",
     isAI: true,
     timestamp: "Just now",
   },
@@ -35,9 +36,9 @@ export default function AIAdvisor() {
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const nextIdRef = useRef(2);
-  const [chatStatus, setChatStatus] = useState<{ ok: boolean; gemini_configured: boolean } | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -47,16 +48,9 @@ export default function AIAdvisor() {
     scrollToBottom();
   }, [messages]);
 
-  useEffect(() => {
-    fetch(`${API_BASE}/chat/status`)
-      .then((r) => r.json())
-      .then((data) => setChatStatus({ ok: true, gemini_configured: !!data?.gemini_configured }))
-      .catch(() => setChatStatus({ ok: false, gemini_configured: false }));
-  }, []);
-
   const handleSendMessage = async (messageText?: string) => {
-    const text = messageText || input;
-    if (!text.trim()) return;
+    const text = (messageText || input).trim();
+    if (!text) return;
 
     const userMsgId = nextIdRef.current++;
     const userMessage: Message = {
@@ -67,56 +61,21 @@ export default function AIAdvisor() {
     };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setChatError(null);
     setIsTyping(true);
 
     const aiMsgId = nextIdRef.current++;
-
-    try {
-      const studentId = getStudentId();
-      const res = await fetch(`${API_BASE}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ student_id: studentId, question: text }),
-      });
-      const data = await res.json().catch(() => ({}));
-      let answer: string;
-      if (res.ok) {
-        const raw = data.answer;
-        answer =
-          typeof raw === "string" && raw.trim() !== ""
-            ? raw.trim()
-            : "No response.";
-      } else {
-        const detail = data.detail;
-        if (typeof detail === "string") answer = detail;
-        else if (Array.isArray(detail) && detail[0]?.msg) answer = detail.map((d: { msg?: string }) => d.msg).join(". ");
-        else answer = "Could not reach the server. Is the backend running at " + API_BASE + "?";
-      }
-      const source =
-        res.ok && Array.isArray(data.sources) && data.sources.length > 0
-          ? data.sources.join(", ")
-          : undefined;
+    setTimeout(() => {
+      const answer = getAnswer(text);
       const aiMessage: Message = {
         id: aiMsgId,
         message: answer,
         isAI: true,
-        source,
         timestamp: "Just now",
       };
       setMessages((prev) => [...prev, aiMessage]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: aiMsgId,
-          message: "Could not reach the server at " + API_BASE + ". Make sure the backend is running.",
-          isAI: true,
-          timestamp: "Just now",
-        },
-      ]);
-    } finally {
       setIsTyping(false);
-    }
+    }, 900);
   };
 
   const handleNavigation = (path: string, nav: string) => {
@@ -125,16 +84,17 @@ export default function AIAdvisor() {
   };
 
   return (
-    <div className="flex h-screen min-h-0 overflow-hidden">
-      {/* Glass sidebar */}
-      <aside className="w-64 flex-shrink-0 flex flex-col glass bento rounded-none border-r border-white/60 dark:border-white/10 rounded-r-2xl overflow-hidden">
-        <div className="p-6 border-b border-white/40 dark:border-white/10">
-          <Link to="/dashboard" className="flex items-center gap-2">
-            <Shield className="w-8 h-8 text-primary" />
-            <span className="text-xl font-bold tracking-tight" style={{ fontFamily: "var(--font-family-heading)" }}>
+    <div className="flex h-screen bg-background">
+      {/* Sidebar */}
+      <aside className="w-64 bg-card border-r border-border flex flex-col">
+        <div className="p-6 border-b border-border flex items-center justify-between gap-2">
+          <Link to="/" className="flex items-center gap-2 min-w-0">
+            <Shield className="w-8 h-8 text-primary shrink-0" />
+            <span className="text-xl font-bold truncate" style={{ fontFamily: "var(--font-family-heading)" }}>
               UniVisa
             </span>
           </Link>
+          <ThemeToggle />
         </div>
         <nav className="flex-1 p-4 space-y-1">
           <button
@@ -158,6 +118,20 @@ export default function AIAdvisor() {
           >
             <Bot className="w-5 h-5" />
             <span>AI Advisor</span>
+          </button>
+          <button
+            onClick={() => handleNavigation("/cpt", "cpt")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeNav === "cpt" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
+          >
+            <Briefcase className="w-5 h-5" />
+            <span>CPT / Internship</span>
+          </button>
+          <button
+            onClick={() => handleNavigation("/opportunities", "opportunities")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeNav === "opportunities" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
+          >
+            <Search className="w-5 h-5" />
+            <span>Opportunities</span>
           </button>
           <button
             onClick={() => handleNavigation("/profile", "profile")}
@@ -184,6 +158,15 @@ export default function AIAdvisor() {
               3
             </span>
           </button>
+          <button
+            onClick={() => handleNavigation("/policy-alerts", "policy")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              activeNav === "policy" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"
+            }`}
+          >
+            <FileText className="w-5 h-5" />
+            <span>Policy Alerts</span>
+          </button>
         </nav>
         <div className="p-4 border-t border-white/40 dark:border-white/10">
           <div className="px-4 py-3">
@@ -200,23 +183,15 @@ export default function AIAdvisor() {
         </div>
       </aside>
 
-      {/* Main: glass header + scroll area + glass input */}
-      <main className="flex-1 flex flex-col min-w-0">
-        <div className="flex-shrink-0 glass border-b border-white/60 dark:border-white/10 px-6 py-5 rounded-b-2xl mx-4 mt-4 mb-0">
-          <h1 className="text-xl font-semibold tracking-tight mb-1">AI Advisor</h1>
-          <p className="text-sm text-muted-foreground">Ask me anything about F-1 visa compliance</p>
-          {chatStatus && !chatStatus.ok && (
-            <div className="mt-3 p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-sm text-destructive">
-              <strong>Backend not reachable.</strong> Start it from the project folder:{" "}
-              <code className="bg-white/50 dark:bg-white/10 px-1.5 py-0.5 rounded">cd univisa-backend && ./run.sh</code> — then refresh.
-            </div>
-          )}
-          {chatStatus?.ok && !chatStatus.gemini_configured && (
-            <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-sm text-amber-700 dark:text-amber-400">
-              <strong>AI not configured.</strong> Add <code className="bg-white/50 dark:bg-white/10 px-1.5 py-0.5 rounded">GEMINI_API_KEY</code> to{" "}
-              <code className="bg-white/50 dark:bg-white/10 px-1.5 py-0.5 rounded">univisa-backend/.env</code> (get a key at{" "}
-              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="underline">Google AI Studio</a>) and restart the backend.
-            </div>
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col">
+        <div className="border-b border-border p-6 bg-card">
+          <h1 className="text-2xl font-semibold mb-2">AI Advisor</h1>
+          <p className="text-sm text-muted-foreground">
+            Ask me anything about F-1 visa compliance (answers from UniVisa Q&A)
+          </p>
+          {chatError && (
+            <p className="mt-2 text-sm text-destructive">{chatError}</p>
           )}
           <div className="flex flex-wrap gap-2 mt-4">
             {QUICK_QUESTIONS.map((question) => (

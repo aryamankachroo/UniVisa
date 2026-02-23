@@ -1,10 +1,34 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
-import { Shield, Users, TrendingUp, AlertTriangle, CheckCircle } from "lucide-react";
+import { Shield, Users, TrendingUp, AlertTriangle, CheckCircle, Briefcase } from "lucide-react";
+import { listDsoCPTRequests, type DsoCPTRequest } from "../api";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { StudentRow } from "../components/StudentRow";
 import { RiskBadge } from "../components/RiskBadge";
 import { Button } from "../components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 import { motion } from "motion/react";
+import { toast } from "sonner";
+
+const SCHEDULE_TIME_SLOTS = [
+  "8:00 AM", "8:30 AM", "9:00 AM", "9:30 AM", "10:00 AM", "10:30 AM",
+  "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM", "1:00 PM", "1:30 PM",
+  "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM", "4:00 PM", "4:30 PM", "5:00 PM",
+];
 
 const STUDENTS_DATA = [
   {
@@ -115,10 +139,20 @@ const SUMMARY_STATS = {
   compliant: 668,
 };
 
+const CPT_STATUS: Record<string, string> = { intent: "Early alert (no offer yet)", offer_signed: "Offer signed — pending", approved: "Approved", rejected: "Rejected" };
+
 export default function DSODashboard() {
   const navigate = useNavigate();
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<"riskScore" | "name">("riskScore");
+  const [cptRequests, setCptRequests] = useState<DsoCPTRequest[]>([]);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+
+  useEffect(() => {
+    listDsoCPTRequests().then(setCptRequests).catch(() => {});
+  }, []);
 
   const sortedStudents = [...STUDENTS_DATA].sort((a, b) => {
     if (sortBy === "riskScore") {
@@ -142,6 +176,7 @@ export default function DSODashboard() {
             <span className="ml-2 text-sm text-muted-foreground">DSO Portal</span>
           </Link>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <span className="text-sm text-muted-foreground">Georgia Tech</span>
             <Button variant="outline" size="sm" onClick={() => navigate("/")}>
               Sign Out
@@ -217,6 +252,46 @@ export default function DSODashboard() {
             <div className="text-sm text-muted-foreground">Compliant</div>
           </motion.div>
         </div>
+
+        {cptRequests.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-card border border-border rounded-lg p-6 mb-8">
+            <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
+              <Briefcase className="w-5 h-5 text-primary" />
+              CPT requests (early visibility)
+            </h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Students who started CPT before signing their offer — prepare approval so it’s faster when they upload the signed offer.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-muted-foreground">
+                    <th className="pb-2 pr-4">Student</th>
+                    <th className="pb-2 pr-4">Company</th>
+                    <th className="pb-2 pr-4">Role</th>
+                    <th className="pb-2 pr-4">Start – End</th>
+                    <th className="pb-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cptRequests.map((r) => (
+                    <tr key={r.id} className="border-b border-border/50">
+                      <td className="py-3 pr-4 font-medium">{r.student_name}</td>
+                      <td className="py-3 pr-4">{r.company_name}</td>
+                      <td className="py-3 pr-4">{r.role}</td>
+                      <td className="py-3 pr-4">{r.expected_start_date} – {r.expected_end_date}</td>
+                      <td className="py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded ${r.status === "intent" ? "bg-primary/20 text-primary" : r.status === "offer_signed" ? "bg-amber-500/20 text-amber-600" : r.status === "approved" ? "bg-green-500/20 text-green-600" : "bg-muted text-muted-foreground"}`}>
+                          {CPT_STATUS[r.status] ?? r.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
 
         {/* Student Table */}
         <div className="bg-card border border-border rounded-lg overflow-hidden">
@@ -331,10 +406,21 @@ export default function DSODashboard() {
                 </div>
 
                 <div className="space-y-2">
-                  <Button className="w-full bg-primary hover:bg-primary/90">
+                  <Button
+                    type="button"
+                    className="w-full bg-primary hover:bg-primary/90"
+                    onClick={() => {
+                      toast.success("Student has been notified.");
+                    }}
+                  >
                     Notify Student
                   </Button>
-                  <Button variant="outline" className="w-full">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setScheduleDialogOpen(true)}
+                  >
                     Schedule Meeting
                   </Button>
                 </div>
@@ -343,6 +429,75 @@ export default function DSODashboard() {
           </div>
         </div>
       </main>
+
+      <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Schedule Meeting</DialogTitle>
+            <DialogDescription>
+              Choose a date and time for the meeting with{" "}
+              {selectedStudentData?.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Date</label>
+              <input
+                type="date"
+                value={scheduleDate}
+                onChange={(e) => setScheduleDate(e.target.value)}
+                min={new Date().toISOString().slice(0, 10)}
+                className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Time</label>
+              <Select value={scheduleTime} onValueChange={setScheduleTime}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select time" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SCHEDULE_TIME_SLOTS.map((slot) => (
+                    <SelectItem key={slot} value={slot}>
+                      {slot}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setScheduleDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (!scheduleDate || !scheduleTime) {
+                  toast.error("Please select both date and time.");
+                  return;
+                }
+                const dateStr = new Date(scheduleDate + "T12:00:00").toLocaleDateString("en-US", {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                });
+                toast.success(`Meeting scheduled for ${dateStr} at ${scheduleTime}.`);
+                setScheduleDialogOpen(false);
+                setScheduleDate("");
+                setScheduleTime("");
+              }}
+            >
+              Schedule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Shield, LayoutDashboard, Bot, User, Bell, LogOut } from "lucide-react";
+import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Briefcase, Search, FileText } from "lucide-react";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { RiskScoreGauge } from "../components/RiskScoreGauge";
 import { RiskBadge } from "../components/RiskBadge";
 import { DeadlineCountdown } from "../components/DeadlineCountdown";
-import { InsightCard } from "../components/InsightCard";
-import { BentoCard } from "../components/BentoCard";
 import { Button } from "../components/ui/button";
 import { motion } from "motion/react";
 
@@ -56,16 +55,17 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="flex h-screen min-h-0 overflow-hidden">
-      {/* Glass sidebar */}
-      <aside className="w-64 flex-shrink-0 flex flex-col glass bento rounded-none border-r border-white/60 dark:border-white/10 mr-0 rounded-r-2xl overflow-hidden">
-        <div className="p-6 border-b border-white/40 dark:border-white/10">
-          <Link to="/dashboard" className="flex items-center gap-2">
-            <Shield className="w-8 h-8 text-primary" />
-            <span className="text-xl font-bold tracking-tight" style={{ fontFamily: "var(--font-family-heading)" }}>
+    <div className="flex h-screen bg-background">
+      {/* Sidebar */}
+      <aside className="w-64 bg-card border-r border-border flex flex-col">
+        <div className="p-6 border-b border-border flex items-center justify-between gap-2">
+          <Link to="/" className="flex items-center gap-2 min-w-0">
+            <Shield className="w-8 h-8 text-primary shrink-0" />
+            <span className="text-xl font-bold truncate" style={{ fontFamily: "var(--font-family-heading)" }}>
               UniVisa
             </span>
           </Link>
+          <ThemeToggle />
         </div>
         <nav className="flex-1 p-4 space-y-1">
           <button
@@ -91,6 +91,20 @@ export default function Dashboard() {
             <span>AI Advisor</span>
           </button>
           <button
+            onClick={() => handleNavigation("/cpt", "cpt")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeNav === "cpt" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
+          >
+            <Briefcase className="w-5 h-5" />
+            <span>CPT / Internship</span>
+          </button>
+          <button
+            onClick={() => handleNavigation("/opportunities", "opportunities")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeNav === "opportunities" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
+          >
+            <Search className="w-5 h-5" />
+            <span>Opportunities</span>
+          </button>
+          <button
             onClick={() => handleNavigation("/profile", "profile")}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
               activeNav === "profile"
@@ -114,6 +128,15 @@ export default function Dashboard() {
             <span className="ml-auto bg-destructive/90 text-destructive-foreground text-xs px-2 py-0.5 rounded-full">
               3
             </span>
+          </button>
+          <button
+            onClick={() => handleNavigation("/policy-alerts", "policy")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              activeNav === "policy" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"
+            }`}
+          >
+            <FileText className="w-5 h-5" />
+            <span>Policy Alerts</span>
           </button>
         </nav>
         <div className="p-4 border-t border-white/40 dark:border-white/10">
@@ -212,26 +235,30 @@ export default function Dashboard() {
               </BentoCard>
             </motion.div>
 
-            {/* AI Advisor CTA bento */}
+            {/* AI Advisor */}
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="col-span-12 md:col-span-4"
+              transition={{ delay: 0.3 }}
+              className="bg-card border border-border rounded-lg p-6 min-h-[320px] flex flex-col items-center text-center"
             >
-              <BentoCard padding="md" className="flex flex-col">
-                <h3 className="text-base font-semibold mb-3">AI Advisor</h3>
-                <p className="text-sm text-muted-foreground flex-1 line-clamp-4 mb-4">
-                  {DEMO_DATA.aiPreview.message}
-                </p>
-                <Button
-                  onClick={() => handleNavigation("/ai-advisor", "ai")}
-                  className="w-full bg-primary hover:bg-primary/90 rounded-xl"
-                >
-                  <Bot className="w-4 h-4 mr-2" />
-                  Continue Conversation
-                </Button>
-              </BentoCard>
+              <h3 className="text-lg font-semibold mb-5">AI Advisor</h3>
+              <div className="bg-background rounded-lg p-5 border border-border mb-6 flex-1 flex flex-col min-h-0 w-full">
+                <div className="flex flex-col gap-4 flex-1 items-center justify-center">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+                    <Bot className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <p className="text-sm leading-relaxed text-center">
+                    {DEMO_DATA.aiPreview.message}
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={() => handleNavigation("/ai-advisor", "ai")}
+                className="w-full bg-primary hover:bg-primary/90"
+              >
+                Continue Conversation
+              </Button>
             </motion.div>
           </div>
         </div>

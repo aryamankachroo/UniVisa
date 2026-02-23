@@ -61,6 +61,38 @@
   --page-bg: linear-gradient(160deg, #f0fdf4 0%, #ffffff 40%, #f8faf8 100%);
 }
 
+/* Light theme (when .light is on html) */
+.light {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #6C63FF;
+  --primary-foreground: #ffffff;
+  --secondary: #e2e8f0;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #6C63FF;
+  --accent-foreground: #ffffff;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: rgba(0, 0, 0, 0.1);
+  --input: rgba(0, 0, 0, 0.1);
+  --input-background: #ffffff;
+  --switch-background: #e2e8f0;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #6C63FF;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1f5f9;
+  --sidebar-accent-foreground: #0f172a;
+  --sidebar-border: rgba(0, 0, 0, 0.08);
+  --sidebar-ring: #6C63FF;
+}
+
 .dark {
   --background: oklch(0.18 0.02 155);
   --foreground: oklch(0.97 0 0);
@@ -216,5 +248,17 @@
     font-size: var(--text-base);
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
+  }
+
+  /* Date inputs: move calendar icon to the right */
+  input[type="date"] {
+    position: relative;
+    padding-inline-end: 2.5rem;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    position: absolute;
+    right: 0.5rem;
+    cursor: pointer;
+    opacity: 0.8;
   }
 }
