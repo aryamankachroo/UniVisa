@@ -8,7 +8,6 @@ import { DeadlineCountdown } from "../components/DeadlineCountdown";
 import { Button } from "../components/ui/button";
 import { motion } from "motion/react";
 
-// Demo data for Riya Sharma
 const DEMO_DATA = {
   student: {
     name: "Riya Sharma",
@@ -68,14 +67,13 @@ export default function Dashboard() {
           </Link>
           <ThemeToggle />
         </div>
-
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-1">
           <button
             onClick={() => handleNavigation("/dashboard", "dashboard")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
               activeNav === "dashboard"
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted text-muted-foreground"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
             }`}
           >
             <LayoutDashboard className="w-5 h-5" />
@@ -83,10 +81,10 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => handleNavigation("/ai-advisor", "ai")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
               activeNav === "ai"
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted text-muted-foreground"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
             }`}
           >
             <Bot className="w-5 h-5" />
@@ -108,10 +106,10 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => handleNavigation("/profile", "profile")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
               activeNav === "profile"
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted text-muted-foreground"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
             }`}
           >
             <User className="w-5 h-5" />
@@ -119,15 +117,15 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => handleNavigation("/alerts", "alerts")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
               activeNav === "alerts"
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted text-muted-foreground"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
             }`}
           >
             <Bell className="w-5 h-5" />
             <span>Alerts</span>
-            <span className="ml-auto bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full">
+            <span className="ml-auto bg-destructive/90 text-destructive-foreground text-xs px-2 py-0.5 rounded-full">
               3
             </span>
           </button>
@@ -141,17 +139,14 @@ export default function Dashboard() {
             <span>Policy Alerts</span>
           </button>
         </nav>
-
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-white/40 dark:border-white/10">
           <div className="px-4 py-3">
-            <div className="font-medium">{DEMO_DATA.student.name}</div>
-            <div className="text-sm text-muted-foreground">
-              {DEMO_DATA.student.university}
-            </div>
+            <div className="font-medium text-foreground">{DEMO_DATA.student.name}</div>
+            <div className="text-sm text-muted-foreground">{DEMO_DATA.student.university}</div>
           </div>
           <button
             onClick={() => navigate("/")}
-            className="w-full flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground mt-2"
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all"
           >
             <LogOut className="w-4 h-4" />
             <span className="text-sm">Sign Out</span>
@@ -159,77 +154,90 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl mx-auto p-8">
-          {/* Risk Score Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-8"
-          >
-            <div className="bg-card border border-border rounded-lg p-8">
-              <div className="flex flex-col items-center">
-                <h2 className="text-xl mb-2">Your F-1 Compliance Risk Score</h2>
-                <p className="text-sm text-muted-foreground mb-6">
-                  Last updated: {DEMO_DATA.student.lastUpdated}
-                </p>
-                <RiskScoreGauge score={DEMO_DATA.student.riskScore} size="lg" />
-              </div>
-            </div>
-          </motion.div>
+      {/* Bento grid main */}
+      <main className="flex-1 overflow-y-auto min-w-0">
+        <div className="max-w-7xl mx-auto p-6 md:p-8">
+          <div className="grid grid-cols-12 gap-4 md:gap-5 auto-rows-fr">
+            {/* Hero: Risk score — large bento */}
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="col-span-12 md:col-span-8">
+              <BentoCard padding="lg" className="h-full flex flex-col justify-center">
+                <div className="flex flex-col items-center text-center">
+                  <h2 className="text-lg font-semibold text-muted-foreground mb-1">F-1 Compliance Risk</h2>
+                  <p className="text-xs text-muted-foreground mb-6">Last updated: {DEMO_DATA.student.lastUpdated}</p>
+                  <RiskScoreGauge score={DEMO_DATA.student.riskScore} size="lg" />
+                </div>
+              </BentoCard>
+            </motion.div>
 
-          {/* Three Column Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {/* Quick insight bento */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+              className="col-span-12 md:col-span-4"
+            >
+              <BentoCard padding="lg" className="h-full flex flex-col justify-center">
+                <InsightCard
+                  variant="minimal"
+                  title="Student Insights"
+                  description="67% of F-1 students from India report confusion around OPT timing"
+                  percentage={67}
+                  source="r/internationalstudents"
+                />
+              </BentoCard>
+            </motion.div>
+
             {/* Active Risks */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="bg-card border border-border rounded-lg p-6"
+              className="col-span-12 md:col-span-4"
             >
-              <h3 className="text-lg font-semibold mb-4">Active Risks</h3>
-              <div className="space-y-3">
-                {DEMO_DATA.activeRisks.map((risk) => (
-                  <div
-                    key={risk.id}
-                    className="p-3 rounded-lg border border-border bg-background"
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <span className="text-sm font-medium">{risk.title}</span>
-                      <RiskBadge level={risk.severity} />
+              <BentoCard padding="md">
+                <h3 className="text-base font-semibold mb-4">Active Risks</h3>
+                <div className="space-y-3">
+                  {DEMO_DATA.activeRisks.map((risk) => (
+                    <div
+                      key={risk.id}
+                      className="p-3 rounded-xl border border-white/60 dark:border-white/10 bg-white/40 dark:bg-white/5"
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <span className="text-sm font-medium">{risk.title}</span>
+                        <RiskBadge level={risk.severity} />
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{risk.description}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      {risk.description}
-                    </p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </BentoCard>
             </motion.div>
 
             {/* Upcoming Deadlines */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-card border border-border rounded-lg p-6"
+              transition={{ delay: 0.15 }}
+              className="col-span-12 md:col-span-4"
             >
-              <h3 className="text-lg font-semibold mb-4">Upcoming Deadlines</h3>
-              <div className="space-y-3">
-                {DEMO_DATA.upcomingDeadlines.map((deadline, idx) => (
-                  <DeadlineCountdown
-                    key={idx}
-                    title={deadline.title}
-                    date={deadline.date}
-                    daysRemaining={deadline.days}
-                  />
-                ))}
-              </div>
+              <BentoCard padding="md">
+                <h3 className="text-base font-semibold mb-4">Upcoming Deadlines</h3>
+                <div className="space-y-3">
+                  {DEMO_DATA.upcomingDeadlines.map((deadline) => (
+                    <DeadlineCountdown
+                      key={deadline.title}
+                      title={deadline.title}
+                      date={deadline.date}
+                      daysRemaining={deadline.days}
+                    />
+                  ))}
+                </div>
+              </BentoCard>
             </motion.div>
 
             {/* AI Advisor */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
               className="bg-card border border-border rounded-lg p-6 min-h-[320px] flex flex-col items-center text-center"

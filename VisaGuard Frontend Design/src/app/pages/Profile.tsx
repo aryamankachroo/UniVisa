@@ -101,33 +101,20 @@ export default function Profile() {
             <span>Policy Alerts</span>
           </button>
         </nav>
-
-        <div className="p-4 border-t border-border">
-          <div className="px-4 py-3">
-            <div className="font-medium">Riya Sharma</div>
-            <div className="text-sm text-muted-foreground">Georgia Tech</div>
-          </div>
-          <button
-            onClick={() => navigate("/")}
-            className="w-full flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground mt-2"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="text-sm">Sign Out</span>
-          </button>
+        <div className="p-4 border-t border-white/40 dark:border-white/10">
+          <div className="px-4 py-3"><div className="font-medium text-foreground">Riya Sharma</div><div className="text-sm text-muted-foreground">Georgia Tech</div></div>
+          <button onClick={() => navigate("/")} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/50 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all mt-2"><LogOut className="w-4 h-4" /><span className="text-sm">Sign Out</span></button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto p-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-semibold mb-2">My Profile</h1>
-            <p className="text-muted-foreground">
-              Manage your personal information and visa details
-            </p>
+      <main className="flex-1 overflow-y-auto min-w-0">
+        <div className="max-w-3xl mx-auto p-6 md:p-8">
+          <div className="glass bento rounded-2xl p-6 mb-6">
+            <h1 className="text-2xl font-semibold tracking-tight mb-1">My Profile</h1>
+            <p className="text-sm text-muted-foreground">Manage your personal information and visa details</p>
           </div>
 
-          <div className="bg-card border border-border rounded-lg p-6 mb-6">
+          <div className="glass bento rounded-2xl p-6 mb-6 border border-white/60 dark:border-white/10">
             <h2 className="text-xl font-semibold mb-6">Personal Information</h2>
             <div className="grid grid-cols-2 gap-6">
               <div>
@@ -170,7 +157,7 @@ export default function Profile() {
             </div>
           </div>
 
-          <div className="bg-card border border-border rounded-lg p-6 mb-6">
+          <div className="glass bento rounded-2xl p-6 mb-6 border border-white/60 dark:border-white/10">
             <h2 className="text-xl font-semibold mb-6">Visa Information</h2>
             <div className="grid grid-cols-2 gap-6">
               <div>
@@ -230,7 +217,7 @@ export default function Profile() {
             </div>
           </div>
 
-          <div className="bg-card border border-border rounded-lg p-6">
+          <div className="glass bento rounded-2xl p-6 border border-white/60 dark:border-white/10">
             <h2 className="text-xl font-semibold mb-6">Employment Information</h2>
             <div className="grid grid-cols-2 gap-6">
               <div>

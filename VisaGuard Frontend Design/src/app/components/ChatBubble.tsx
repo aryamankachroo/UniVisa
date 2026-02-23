@@ -16,10 +16,10 @@ export function ChatBubble({ message, isAI, source, timestamp }: ChatBubbleProps
           <Bot className="w-5 h-5 text-primary-foreground" />
         </div>
         <div className="flex-1 max-w-[80%]">
-          <div className="bg-card rounded-lg rounded-tl-none p-4 border border-border">
+          <div className="glass bento rounded-2xl rounded-tl-none p-4 border border-white/60 dark:border-white/10">
             <p className="text-sm leading-relaxed">{message}</p>
             {source && (
-              <div className="mt-3 pt-3 border-t border-border">
+              <div className="mt-3 pt-3 border-t border-white/40 dark:border-white/10">
                 <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
                   <span className="text-primary">📄</span>
                   <span>Source: {source}</span>

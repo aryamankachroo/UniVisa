@@ -52,6 +52,7 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const [showRoleSelection, setShowRoleSelection] = useState(true);
   const [step, setStep] = useState(1);
+  const [universityOpen, setUniversityOpen] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
     university: "",
