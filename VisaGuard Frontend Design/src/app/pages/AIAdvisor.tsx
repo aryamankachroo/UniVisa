@@ -6,6 +6,7 @@ import { ChatBubble } from "../components/ChatBubble";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { getAnswer } from "../UniVisaAdvisor";
+import { chat, getStudentId } from "../api";
 
 interface Message {
   id: number;
@@ -65,17 +66,39 @@ export default function AIAdvisor() {
     setIsTyping(true);
 
     const aiMsgId = nextIdRef.current++;
-    setTimeout(() => {
-      const answer = getAnswer(text);
+    try {
+      const studentId = getStudentId();
+      const result = await chat(studentId, text);
+      const answer = result?.answer ?? "No response.";
+      const isErrorAnswer =
+        /GEMINI_API_KEY|encountered an error|not configured|could not respond|Please try again/i.test(
+          answer
+        );
+      const useBackend = !isErrorAnswer && answer !== "No response.";
+      const finalAnswer = useBackend ? answer : getAnswer(text);
+      const source = useBackend && result?.sources?.length ? result.sources[0] : undefined;
       const aiMessage: Message = {
         id: aiMsgId,
-        message: answer,
+        message: finalAnswer,
         isAI: true,
         timestamp: "Just now",
+        source,
       };
       setMessages((prev) => [...prev, aiMessage]);
+    } catch {
+      const fallbackAnswer = getAnswer(text);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: aiMsgId,
+          message: fallbackAnswer,
+          isAI: true,
+          timestamp: "Just now",
+        },
+      ]);
+    } finally {
       setIsTyping(false);
-    }, 900);
+    }
   };
 
   const handleNavigation = (path: string, nav: string) => {
