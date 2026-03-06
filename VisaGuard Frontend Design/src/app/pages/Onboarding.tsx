@@ -32,12 +32,13 @@ const TOP_UNIVERSITIES = [
   "Carnegie Mellon University",
 ];
 
-type VisaStage = "studying" | "opt" | "stem_opt" | "opt_approved_not_started";
+type VisaStage = "studying" | "cpt" | "opt" | "stem_opt" | "opt_approved_not_started";
 type EnrollmentStatus = "full_time" | "reduced_course_load" | "not_enrolled";
 type TrainingType = "none" | "cpt" | "opt" | "stem_opt";
 type StemEligible = "yes" | "no" | "not_sure" | "";
-type StemApproved = "yes" | "no" | "pending" | "";
+type StemApplicationStatus = "yes" | "no" | "pending" | "";
 type SevisHistory = "yes" | "no" | "not_sure" | "";
+type CptType = "part_time" | "full_time" | "";
 
 interface ImmigrationCaseInput {
   // Step 1 — Basic Profile
@@ -65,15 +66,20 @@ interface ImmigrationCaseInput {
   opt_start_date: string;
   opt_end_date: string;
 
+  // CPT-specific
+  using_cpt: boolean;
+  cpt_hours: number;
+  cpt_type: CptType;
+
   // Step 6 — STEM
   stem_eligible: StemEligible;
-  stem_approved: StemApproved;
+  stem_application_status: StemApplicationStatus;
 
   // Step 7 — Employment
   employed_in_authorized_job: boolean;
   planning_employer_change: boolean;
 
-  // Step 8 — Risk Factors
+  // Risk (global)
   unemployment_days_used: number;
   travel_plans_next_90_days: boolean;
   received_uscis_notices: boolean;
@@ -85,11 +91,8 @@ interface FormData {
   fullName: string;
   university: string;
   country: string;
-  visaType: "F-1" | "J-1" | "";
 
-  // Visa status
-  isOnF1: boolean | null;
-  insideUS: boolean | null;
+  // Visa status (stage only — app is F-1 only)
   currentStage: VisaStage;
 
   // Academic program
@@ -98,9 +101,11 @@ interface FormData {
   enrollmentStatus: EnrollmentStatus;
   courseChanges: boolean;
 
-  // Work compliance
+  // Work compliance (studying / CPT)
   workHours: number;
-  trainingType: TrainingType;
+  usingCpt: boolean;
+  cptHours: number;
+  cptType: CptType;
 
   // OPT details
   optStart: string;
@@ -108,7 +113,7 @@ interface FormData {
 
   // STEM
   stemEligible: StemEligible;
-  stemApproved: StemApproved;
+  stemApplicationStatus: StemApplicationStatus;
 
   // Employment
   employedInAuthorizedJob: boolean | null;
@@ -126,25 +131,24 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const [showRoleSelection, setShowRoleSelection] = useState(true);
   const [step, setStep] = useState(1);
-  const TOTAL_STEPS = 7;
+  const TOTAL_STEPS = 5;
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
     university: "",
     country: "",
-    visaType: "",
-    isOnF1: null,
-    insideUS: null,
     currentStage: "studying",
     programStart: "",
     programEnd: "",
     enrollmentStatus: "full_time",
     courseChanges: false,
     workHours: 18,
-    trainingType: "none",
+    usingCpt: false,
+    cptHours: 20,
+    cptType: "part_time",
     optStart: "",
     optEnd: "",
     stemEligible: "",
-    stemApproved: "",
+    stemApplicationStatus: "",
     employedInAuthorizedJob: null,
     changeEmployer: null,
     unemploymentDaysUsed: "",
@@ -190,14 +194,26 @@ export default function Onboarding() {
   };
 
   const buildImmigrationCaseInput = (): ImmigrationCaseInput => {
+    // Derive training type based on current stage and CPT usage
+    let training_type: TrainingType = "none";
+    if (formData.currentStage === "cpt") {
+      training_type = "cpt";
+    } else if (formData.currentStage === "opt" || formData.currentStage === "opt_approved_not_started") {
+      training_type = "opt";
+    } else if (formData.currentStage === "stem_opt") {
+      training_type = "stem_opt";
+    } else if (formData.currentStage === "studying" && formData.usingCpt) {
+      training_type = "cpt";
+    }
+
     return {
       full_name: formData.fullName,
       university_name: formData.university,
       country_of_origin: formData.country,
-      visa_type: formData.visaType,
+      visa_type: "F-1",
 
-      is_on_f1: formData.isOnF1 ?? false,
-      inside_us: formData.insideUS ?? false,
+      is_on_f1: true,
+      inside_us: true,
       current_stage: formData.currentStage,
 
       program_start_date: formData.programStart,
@@ -206,13 +222,17 @@ export default function Onboarding() {
       planning_course_changes: formData.courseChanges,
 
       on_campus_hours: formData.workHours,
-      training_type: formData.trainingType,
+      training_type,
 
       opt_start_date: formData.optStart,
       opt_end_date: formData.optEnd,
 
+      using_cpt: formData.currentStage === "cpt" || formData.usingCpt,
+      cpt_hours: formData.cptHours,
+      cpt_type: formData.cptType,
+
       stem_eligible: formData.stemEligible,
-      stem_approved: formData.stemApproved,
+      stem_application_status: formData.stemApplicationStatus,
 
       employed_in_authorized_job: formData.employedInAuthorizedJob ?? false,
       planning_employer_change: formData.changeEmployer ?? false,
@@ -507,40 +527,6 @@ export default function Onboarding() {
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div>
-                  <Label className="mb-3 block">Visa Type</Label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      type="button"
-                      onClick={() => updateField("visaType", "F-1")}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.visaType === "F-1"
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-transparent hover:border-primary/50"
-                      }`}
-                    >
-                      <div className="font-semibold mb-1">F-1 Visa</div>
-                      <div className="text-sm text-muted-foreground">
-                        Academic Student
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateField("visaType", "J-1")}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.visaType === "J-1"
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-transparent hover:border-primary/50"
-                      }`}
-                    >
-                      <div className="font-semibold mb-1">J-1 Visa</div>
-                      <div className="text-sm text-muted-foreground">
-                        Exchange Visitor
-                      </div>
-                    </button>
-                  </div>
-                </div>
               </motion.div>
             )}
 
@@ -552,64 +538,10 @@ export default function Onboarding() {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
-                <h2 className="text-2xl font-semibold mb-6">Visa status</h2>
-
-                <div>
-                  <Label className="mb-3 block">Are you currently in F-1 status?</Label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      type="button"
-                      onClick={() => updateField("isOnF1", true)}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.isOnF1 === true
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      Yes
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateField("isOnF1", false)}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.isOnF1 === false
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      No
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="mb-3 block">Are you currently inside the US?</Label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      type="button"
-                      onClick={() => updateField("insideUS", true)}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.insideUS === true
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      Yes
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateField("insideUS", false)}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.insideUS === false
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      No
-                    </button>
-                  </div>
-                </div>
-
+                <h2 className="text-2xl font-semibold mb-6">Your current F-1 stage</h2>
+                <p className="text-muted-foreground text-sm mb-4">
+                  This determines which questions we show next.
+                </p>
                 <div>
                   <Label htmlFor="currentStage">Current stage</Label>
                   <Select
@@ -617,10 +549,11 @@ export default function Onboarding() {
                     onValueChange={(value) => updateField("currentStage", value as VisaStage)}
                   >
                     <SelectTrigger className="mt-1.5">
-                      <SelectValue />
+                      <SelectValue placeholder="Select your stage" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="studying">Studying (in program)</SelectItem>
+                      <SelectItem value="cpt">On CPT (Curricular Practical Training)</SelectItem>
                       <SelectItem value="opt">On standard OPT</SelectItem>
                       <SelectItem value="stem_opt">On STEM OPT</SelectItem>
                       <SelectItem value="opt_approved_not_started">OPT approved, not started</SelectItem>
@@ -638,8 +571,7 @@ export default function Onboarding() {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
-                <h2 className="text-2xl font-semibold mb-6">Academic program</h2>
-
+                <h2 className="text-2xl font-semibold mb-6">Program dates</h2>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="programStart">Program start date (I-20)</Label>
@@ -662,53 +594,6 @@ export default function Onboarding() {
                     />
                   </div>
                 </div>
-
-                <div>
-                  <Label htmlFor="enrollmentStatus">Current enrollment status</Label>
-                  <Select
-                    value={formData.enrollmentStatus}
-                    onValueChange={(value) => updateField("enrollmentStatus", value as EnrollmentStatus)}
-                  >
-                    <SelectTrigger className="mt-1.5">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="full_time">Full-time</SelectItem>
-                      <SelectItem value="reduced_course_load">Reduced course load (authorized)</SelectItem>
-                      <SelectItem value="not_enrolled">Not enrolled this term</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label className="mb-3 block">
-                    Planning to drop or add courses this semester?
-                  </Label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      type="button"
-                      onClick={() => updateField("courseChanges", true)}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.courseChanges
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      Yes
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateField("courseChanges", false)}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        !formData.courseChanges
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      No
-                    </button>
-                  </div>
-                </div>
               </motion.div>
             )}
 
@@ -720,44 +605,177 @@ export default function Onboarding() {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
-                <h2 className="text-2xl font-semibold mb-6">Work compliance</h2>
+                <h2 className="text-2xl font-semibold mb-6">Details for your stage</h2>
 
-                <div>
-                  <Label htmlFor="workHours">
-                    Weekly on-campus work hours: {formData.workHours}
-                  </Label>
-                  <Slider
-                    id="workHours"
-                    min={0}
-                    max={40}
-                    step={1}
-                    value={[formData.workHours]}
-                    onValueChange={(value) => updateField("workHours", value[0])}
-                    className="mt-3"
-                  />
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>0 hours</span>
-                    <span>40 hours</span>
-                  </div>
-                </div>
+                {formData.currentStage === "studying" && (
+                  <>
+                    <div>
+                      <Label htmlFor="enrollmentStatus">Enrollment status</Label>
+                      <Select
+                        value={formData.enrollmentStatus}
+                        onValueChange={(value) => updateField("enrollmentStatus", value as EnrollmentStatus)}
+                      >
+                        <SelectTrigger className="mt-1.5">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="full_time">Full-time</SelectItem>
+                          <SelectItem value="reduced_course_load">Reduced course load (authorized)</SelectItem>
+                          <SelectItem value="not_enrolled">Not enrolled this term</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="workHours">Weekly on-campus work hours: {formData.workHours}</Label>
+                      <Slider
+                        id="workHours"
+                        min={0}
+                        max={40}
+                        step={1}
+                        value={[formData.workHours]}
+                        onValueChange={(value) => updateField("workHours", value[0])}
+                        className="mt-3"
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                        <span>0</span>
+                        <span>40</span>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="mb-3 block">Planning to drop or add courses this semester?</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button type="button" onClick={() => updateField("courseChanges", true)}
+                          className={`p-4 rounded-lg border-2 transition-all ${formData.courseChanges ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>Yes</button>
+                        <button type="button" onClick={() => updateField("courseChanges", false)}
+                          className={`p-4 rounded-lg border-2 transition-all ${!formData.courseChanges ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>No</button>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="mb-3 block">Using CPT for off-campus work?</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button type="button" onClick={() => updateField("usingCpt", true)}
+                          className={`p-4 rounded-lg border-2 transition-all ${formData.usingCpt ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>Yes</button>
+                        <button type="button" onClick={() => updateField("usingCpt", false)}
+                          className={`p-4 rounded-lg border-2 transition-all ${!formData.usingCpt ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>No</button>
+                      </div>
+                    </div>
+                  </>
+                )}
 
-                <div>
-                  <Label htmlFor="trainingType">Current training authorization</Label>
-                  <Select
-                    value={formData.trainingType}
-                    onValueChange={(value) => updateField("trainingType", value as TrainingType)}
-                  >
-                    <SelectTrigger className="mt-1.5">
-                      <SelectValue placeholder="Select training type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="cpt">CPT (Curricular Practical Training)</SelectItem>
-                      <SelectItem value="opt">OPT (Optional Practical Training)</SelectItem>
-                      <SelectItem value="stem_opt">STEM OPT extension</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {formData.currentStage === "cpt" && (
+                  <>
+                    <div>
+                      <Label htmlFor="enrollmentStatusCpt">Enrollment status</Label>
+                      <Select value={formData.enrollmentStatus} onValueChange={(value) => updateField("enrollmentStatus", value as EnrollmentStatus)}>
+                        <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="full_time">Full-time</SelectItem>
+                          <SelectItem value="reduced_course_load">Reduced course load</SelectItem>
+                          <SelectItem value="not_enrolled">Not enrolled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>CPT hours per week: {formData.cptHours}</Label>
+                      <Slider id="cptHours" min={0} max={40} step={1} value={[formData.cptHours]} onValueChange={(v) => updateField("cptHours", v[0])} className="mt-3" />
+                    </div>
+                    <div>
+                      <Label htmlFor="cptType">CPT type</Label>
+                      <Select value={formData.cptType} onValueChange={(value) => updateField("cptType", value as CptType)}>
+                        <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="part_time">Part-time (≤20 hrs/week)</SelectItem>
+                          <SelectItem value="full_time">Full-time</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+
+                {formData.currentStage === "opt" && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="optStart">OPT start date</Label>
+                        <Input id="optStart" type="date" value={formData.optStart} onChange={(e) => updateField("optStart", e.target.value)} className="mt-1.5" />
+                      </div>
+                      <div>
+                        <Label htmlFor="optEnd">OPT end date</Label>
+                        <Input id="optEnd" type="date" value={formData.optEnd} onChange={(e) => updateField("optEnd", e.target.value)} className="mt-1.5" />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="unemploymentDays">Unemployment days used</Label>
+                      <Input id="unemploymentDays" type="number" min={0} value={formData.unemploymentDaysUsed}
+                        onChange={(e) => { const v = e.target.value; updateField("unemploymentDaysUsed", v === "" ? "" : Math.max(0, Number(v) || 0)); }} className="mt-1.5" />
+                    </div>
+                    <div>
+                      <Label className="mb-3 block">Employed in a job authorized for OPT?</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button type="button" onClick={() => updateField("employedInAuthorizedJob", true)}
+                          className={`p-4 rounded-lg border-2 transition-all ${formData.employedInAuthorizedJob === true ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>Yes</button>
+                        <button type="button" onClick={() => updateField("employedInAuthorizedJob", false)}
+                          className={`p-4 rounded-lg border-2 transition-all ${formData.employedInAuthorizedJob === false ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>No</button>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="mb-3 block">Planning to change employers?</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button type="button" onClick={() => updateField("changeEmployer", true)}
+                          className={`p-4 rounded-lg border-2 transition-all ${formData.changeEmployer === true ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>Yes</button>
+                        <button type="button" onClick={() => updateField("changeEmployer", false)}
+                          className={`p-4 rounded-lg border-2 transition-all ${formData.changeEmployer === false ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>No</button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {formData.currentStage === "stem_opt" && (
+                  <>
+                    <div>
+                      <Label className="mb-3 block">Degree STEM-eligible for STEM OPT?</Label>
+                      <div className="grid grid-cols-3 gap-4">
+                        <button type="button" onClick={() => updateField("stemEligible", "yes")} className={`p-3 rounded-lg border-2 text-sm ${formData.stemEligible === "yes" ? "border-primary bg-primary/10" : "border-border"}`}>Yes</button>
+                        <button type="button" onClick={() => updateField("stemEligible", "no")} className={`p-3 rounded-lg border-2 text-sm ${formData.stemEligible === "no" ? "border-primary bg-primary/10" : "border-border"}`}>No</button>
+                        <button type="button" onClick={() => updateField("stemEligible", "not_sure")} className={`p-3 rounded-lg border-2 text-sm ${formData.stemEligible === "not_sure" ? "border-primary bg-primary/10" : "border-border"}`}>Not sure</button>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="mb-3 block">STEM OPT application status</Label>
+                      <div className="grid grid-cols-3 gap-4">
+                        <button type="button" onClick={() => updateField("stemApplicationStatus", "yes")} className={`p-3 rounded-lg border-2 text-sm ${formData.stemApplicationStatus === "yes" ? "border-primary bg-primary/10" : "border-border"}`}>Approved</button>
+                        <button type="button" onClick={() => updateField("stemApplicationStatus", "pending")} className={`p-3 rounded-lg border-2 text-sm ${formData.stemApplicationStatus === "pending" ? "border-primary bg-primary/10" : "border-border"}`}>Pending</button>
+                        <button type="button" onClick={() => updateField("stemApplicationStatus", "no")} className={`p-3 rounded-lg border-2 text-sm ${formData.stemApplicationStatus === "no" ? "border-primary bg-primary/10" : "border-border"}`}>Not applied</button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><Label>OPT/STEM OPT start date</Label><Input type="date" value={formData.optStart} onChange={(e) => updateField("optStart", e.target.value)} className="mt-1.5" /></div>
+                      <div><Label>OPT/STEM OPT end date</Label><Input type="date" value={formData.optEnd} onChange={(e) => updateField("optEnd", e.target.value)} className="mt-1.5" /></div>
+                    </div>
+                    <div>
+                      <Label>Unemployment days used (OPT + STEM OPT)</Label>
+                      <Input type="number" min={0} value={formData.unemploymentDaysUsed}
+                        onChange={(e) => { const v = e.target.value; updateField("unemploymentDaysUsed", v === "" ? "" : Math.max(0, Number(v) || 0)); }} className="mt-1.5" />
+                    </div>
+                    <div>
+                      <Label className="mb-3 block">Planning to change employers?</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button type="button" onClick={() => updateField("changeEmployer", true)} className={`p-4 rounded-lg border-2 ${formData.changeEmployer === true ? "border-primary bg-primary/10" : "border-border"}`}>Yes</button>
+                        <button type="button" onClick={() => updateField("changeEmployer", false)} className={`p-4 rounded-lg border-2 ${formData.changeEmployer === false ? "border-primary bg-primary/10" : "border-border"}`}>No</button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {formData.currentStage === "opt_approved_not_started" && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><Label>OPT start date</Label><Input type="date" value={formData.optStart} onChange={(e) => updateField("optStart", e.target.value)} className="mt-1.5" /></div>
+                      <div><Label>OPT end date</Label><Input type="date" value={formData.optEnd} onChange={(e) => updateField("optEnd", e.target.value)} className="mt-1.5" /></div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">We only need your OPT dates until you start.</p>
+                  </>
+                )}
               </motion.div>
             )}
 
@@ -769,185 +787,7 @@ export default function Onboarding() {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
-                <h2 className="text-2xl font-semibold mb-6">STEM eligibility</h2>
-
-                <div>
-                  <Label className="mb-3 block">Is your degree STEM-eligible for STEM OPT?</Label>
-                  <div className="grid grid-cols-3 gap-4">
-                    <button
-                      type="button"
-                      onClick={() => updateField("stemEligible", "yes")}
-                      className={`p-3 rounded-lg border-2 text-sm transition-all ${
-                        formData.stemEligible === "yes"
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      Yes
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateField("stemEligible", "no")}
-                      className={`p-3 rounded-lg border-2 text-sm transition-all ${
-                        formData.stemEligible === "no"
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      No
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateField("stemEligible", "not_sure")}
-                      className={`p-3 rounded-lg border-2 text-sm transition-all ${
-                        formData.stemEligible === "not_sure"
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      Not sure
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="mb-3 block">STEM OPT application status</Label>
-                  <div className="grid grid-cols-3 gap-4">
-                    <button
-                      type="button"
-                      onClick={() => updateField("stemApproved", "yes")}
-                      className={`p-3 rounded-lg border-2 text-sm transition-all ${
-                        formData.stemApproved === "yes"
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      Approved
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateField("stemApproved", "pending")}
-                      className={`p-3 rounded-lg border-2 text-sm transition-all ${
-                        formData.stemApproved === "pending"
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      Pending
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateField("stemApproved", "no")}
-                      className={`p-3 rounded-lg border-2 text-sm transition-all ${
-                        formData.stemApproved === "no"
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      Not applied / denied
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {step === 6 && (
-              <motion.div
-                key="step6"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
-              >
-                <h2 className="text-2xl font-semibold mb-6">Employment</h2>
-
-                <div>
-                  <Label className="mb-3 block">Are you working in a job authorized for your status?</Label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      type="button"
-                      onClick={() => updateField("employedInAuthorizedJob", true)}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.employedInAuthorizedJob === true
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      Yes
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateField("employedInAuthorizedJob", false)}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.employedInAuthorizedJob === false
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      No / not working
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="mb-3 block">
-                    Planning to change employers?
-                  </Label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      type="button"
-                      onClick={() => updateField("changeEmployer", true)}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.changeEmployer === true
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      Yes
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateField("changeEmployer", false)}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.changeEmployer === false
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      No
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {step === 7 && (
-              <motion.div
-                key="step7"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
-              >
                 <h2 className="text-2xl font-semibold mb-6">Risk factors</h2>
-
-                <div>
-                  <Label htmlFor="unemploymentDays">Total unemployment days used (if on OPT/STEM)</Label>
-                  <Input
-                    id="unemploymentDays"
-                    type="number"
-                    min={0}
-                    value={formData.unemploymentDaysUsed}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      updateField(
-                        "unemploymentDaysUsed",
-                        value === "" ? "" : Math.max(0, Number.isNaN(Number(value)) ? 0 : Number(value))
-                      );
-                    }}
-                    className="mt-1.5"
-                  />
-                </div>
 
                 <div>
                   <Label className="mb-3 block">
