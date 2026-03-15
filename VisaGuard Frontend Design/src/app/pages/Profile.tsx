@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { useClerk, useUser } from "@clerk/react";
 import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Briefcase, Search, FileText } from "lucide-react";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { Button } from "../components/ui/button";
@@ -8,7 +9,26 @@ import { Label } from "../components/ui/label";
 
 export default function Profile() {
   const navigate = useNavigate();
+  const { user } = useUser();
+  const { signOut } = useClerk();
   const [activeNav, setActiveNav] = useState("profile");
+  const [localCase, setLocalCase] = useState<any | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("immigration_case_input");
+      if (raw) {
+        setLocalCase(JSON.parse(raw));
+      }
+    } catch {
+      setLocalCase(null);
+    }
+  }, []);
+
+  const clerkName =
+    user && (user.fullName || [user.firstName, user.lastName].filter(Boolean).join(" ").trim()) || "Student";
+  const university = localCase?.university_name ?? localCase?.university ?? "Your university";
+  const country = localCase?.country ?? "Your country";
 
   const handleNavigation = (path: string, nav: string) => {
     setActiveNav(nav);
@@ -104,11 +124,11 @@ export default function Profile() {
 
         <div className="p-4 border-t border-border">
           <div className="px-4 py-3">
-            <div className="font-medium">Riya Sharma</div>
-            <div className="text-sm text-muted-foreground">Georgia Tech</div>
+            <div className="font-medium">{clerkName}</div>
+            <div className="text-sm text-muted-foreground">{university}</div>
           </div>
           <button
-            onClick={() => navigate("/")}
+            onClick={() => signOut({ redirectUrl: "/" })}
             className="w-full flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground mt-2"
           >
             <LogOut className="w-4 h-4" />
@@ -134,7 +154,7 @@ export default function Profile() {
                 <Label htmlFor="fullName">Full Name</Label>
                 <Input
                   id="fullName"
-                  defaultValue="Riya Sharma"
+                  defaultValue={clerkName}
                   className="mt-1.5"
                   readOnly
                 />
@@ -153,7 +173,7 @@ export default function Profile() {
                 <Label htmlFor="university">University</Label>
                 <Input
                   id="university"
-                  defaultValue="Georgia Institute of Technology"
+                  defaultValue={university}
                   className="mt-1.5"
                   readOnly
                 />
@@ -162,7 +182,7 @@ export default function Profile() {
                 <Label htmlFor="country">Country of Origin</Label>
                 <Input
                   id="country"
-                  defaultValue="India"
+                  defaultValue={country}
                   className="mt-1.5"
                   readOnly
                 />

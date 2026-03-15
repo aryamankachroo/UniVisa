@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { useClerk, useUser } from "@clerk/react";
 import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Briefcase, Search, FileText } from "lucide-react";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { RiskScoreGauge } from "../components/RiskScoreGauge";
@@ -8,7 +9,7 @@ import { DeadlineCountdown } from "../components/DeadlineCountdown";
 import { Button } from "../components/ui/button";
 import { motion } from "motion/react";
 
-// Demo data for Riya Sharma
+// Demo data fallback (used until Supabase-backed data is available)
 const DEMO_DATA = {
   student: {
     name: "Riya Sharma",
@@ -48,7 +49,64 @@ const DEMO_DATA = {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
   const [activeNav, setActiveNav] = useState("dashboard");
+  const [dashboardData, setDashboardData] = useState<{
+    profile: any;
+    risk: any;
+    questionnaire: any;
+  } | null>(null);
+
+  // Backend API base (same convention as Onboarding)
+  const API_BASE =
+    (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "http://localhost:8000";
+
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+
+    fetch(`${API_BASE}/api/cases/me?clerk_user_id=${encodeURIComponent(user.id)}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load dashboard data");
+        return res.json();
+      })
+      .then((data) => {
+        setDashboardData(data);
+      })
+      .catch((err) => {
+        console.error("Failed to load dashboard data", err);
+      });
+  }, [API_BASE, isLoaded, user]);
+
+  // Prefer Clerk name, then Supabase profile, then demo
+  const clerkName =
+    user && (user.fullName || [user.firstName, user.lastName].filter(Boolean).join(" ").trim()) || null;
+
+  // Load last questionnaire from localStorage as another fallback (for university)
+  const [localCase, setLocalCase] = useState<any | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("immigration_case_input");
+      if (raw) {
+        setLocalCase(JSON.parse(raw));
+      }
+    } catch {
+      setLocalCase(null);
+    }
+  }, []);
+
+  const studentName =
+    clerkName ?? dashboardData?.profile?.full_name ?? DEMO_DATA.student.name;
+
+  const studentUniversity =
+    dashboardData?.profile?.university ??
+    localCase?.university_name ??
+    localCase?.university ??
+    DEMO_DATA.student.university;
+  const riskScore = dashboardData?.risk?.riskScore ?? DEMO_DATA.student.riskScore;
+  const lastUpdated =
+    dashboardData && dashboardData.risk ? new Date().toLocaleString() : DEMO_DATA.student.lastUpdated;
 
   const handleNavigation = (path: string, nav: string) => {
     setActiveNav(nav);
@@ -144,13 +202,13 @@ export default function Dashboard() {
 
         <div className="p-4 border-t border-border">
           <div className="px-4 py-3">
-            <div className="font-medium">{DEMO_DATA.student.name}</div>
+            <div className="font-medium">{studentName}</div>
             <div className="text-sm text-muted-foreground">
-              {DEMO_DATA.student.university}
+              {studentUniversity}
             </div>
           </div>
           <button
-            onClick={() => navigate("/")}
+            onClick={() => signOut({ redirectUrl: "/" })}
             className="w-full flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground mt-2"
           >
             <LogOut className="w-4 h-4" />
@@ -172,9 +230,9 @@ export default function Dashboard() {
               <div className="flex flex-col items-center">
                 <h2 className="text-xl mb-2">Your F-1 Compliance Risk Score</h2>
                 <p className="text-sm text-muted-foreground mb-6">
-                  Last updated: {DEMO_DATA.student.lastUpdated}
+                  Last updated: {lastUpdated}
                 </p>
-                <RiskScoreGauge score={DEMO_DATA.student.riskScore} size="lg" />
+                <RiskScoreGauge score={riskScore} size="lg" />
               </div>
             </div>
           </motion.div>

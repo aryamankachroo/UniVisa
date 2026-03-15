@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
+import { Show, SignInButton, SignUpButton, UserButton, useUser } from "@clerk/react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -11,7 +12,7 @@ import { ThemeToggle } from "../components/ThemeToggle";
 
 const API_BASE = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "http://localhost:8000";
 const UNIVERSITIES_API = `${API_BASE}/universities`;
-const COMPLIANCE_ANALYZE_API = `${API_BASE}/api/compliance/analyze`;
+const CASES_SUBMIT_API = `${API_BASE}/api/cases/submit`;
 
 const COUNTRIES = [
   "Afghanistan", "Albania", "Algeria", "Argentina", "Australia", "Austria", "Bangladesh", "Belgium", "Brazil", "Bulgaria",
@@ -41,50 +42,40 @@ type SevisHistory = "yes" | "no" | "not_sure" | "";
 type CptType = "part_time" | "full_time" | "";
 
 interface ImmigrationCaseInput {
-  // Step 1 — Basic Profile
-  full_name: string;
-  university_name: string;
-  country_of_origin: string;
-  visa_type: "F-1" | "J-1" | "";
+  // These fields mirror backend.backend.risk_engine.types.ImmigrationCaseInput
+  fullName: string;
+  university: string;
+  country: string;
 
-  // Step 2 — Visa Status
-  is_on_f1: boolean;
-  inside_us: boolean;
-  current_stage: VisaStage;
+  currentStage: VisaStage;
 
-  // Step 3 — Academic Program
-  program_start_date: string;
-  program_end_date: string;
-  enrollment_status: EnrollmentStatus;
-  planning_course_changes: boolean;
+  programStart: string;
+  programEnd: string;
 
-  // Step 4 — Work Compliance
-  on_campus_hours: number;
-  training_type: TrainingType;
+  enrollmentStatus: EnrollmentStatus;
 
-  // Step 5 — OPT Details
-  opt_start_date: string;
-  opt_end_date: string;
+  workHours?: number;
+  courseChanges?: boolean;
+  usingCpt?: boolean;
 
-  // CPT-specific
-  using_cpt: boolean;
-  cpt_hours: number;
-  cpt_type: CptType;
+  cptHours?: number;
+  cptType?: CptType | "";
 
-  // Step 6 — STEM
-  stem_eligible: StemEligible;
-  stem_application_status: StemApplicationStatus;
+  optStart?: string;
+  optEnd?: string;
 
-  // Step 7 — Employment
-  employed_in_authorized_job: boolean;
-  planning_employer_change: boolean;
+  unemploymentDaysUsed?: number;
 
-  // Risk (global)
-  unemployment_days_used: number;
-  travel_plans_next_90_days: boolean;
-  received_uscis_notices: boolean;
-  unauthorized_work: boolean;
-  sevis_terminated_before: SevisHistory;
+  employedInAuthorizedJob?: boolean;
+  changeEmployer?: boolean;
+
+  stemEligible?: boolean | null;
+  stemApplicationStatus?: "not_applied" | "pending" | "approved" | "denied";
+
+  travelPlans?: boolean;
+  receivedUSCISNotices?: boolean;
+  unauthorizedWork?: boolean;
+  sevisTerminatedBefore?: boolean | null;
 }
 
 interface FormData {
@@ -129,6 +120,7 @@ interface FormData {
 
 export default function Onboarding() {
   const navigate = useNavigate();
+  const { isLoaded, isSignedIn, user } = useUser();
   const [showRoleSelection, setShowRoleSelection] = useState(true);
   const [step, setStep] = useState(1);
   const TOTAL_STEPS = 5;
@@ -161,12 +153,11 @@ export default function Onboarding() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<{
-    risk_score?: number;
-    current_stage?: string;
-    unemployment_usage?: number;
-    next_deadline?: string | null;
-    urgent_tasks?: string[];
-    compliance_explanation?: string;
+    riskScore: number;
+    riskLevel: string;
+    flags: { code: string; description?: string | null }[];
+    tasks: string[];
+    deadlines: { nextDeadline: string | null; daysUntilNextDeadline: number | null };
   } | null>(null);
 
   const [universities, setUniversities] = useState<string[]>(TOP_UNIVERSITIES);
@@ -189,80 +180,103 @@ export default function Onboarding() {
       });
   }, []);
 
+  // Once Clerk finishes loading and user is signed in, automatically go to questionnaire
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      setShowRoleSelection(false);
+    }
+  }, [isLoaded, isSignedIn]);
+
   const updateField = (field: keyof FormData, value: FormData[typeof field]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const buildImmigrationCaseInput = (): ImmigrationCaseInput => {
-    // Derive training type based on current stage and CPT usage
-    let training_type: TrainingType = "none";
-    if (formData.currentStage === "cpt") {
-      training_type = "cpt";
-    } else if (formData.currentStage === "opt" || formData.currentStage === "opt_approved_not_started") {
-      training_type = "opt";
-    } else if (formData.currentStage === "stem_opt") {
-      training_type = "stem_opt";
-    } else if (formData.currentStage === "studying" && formData.usingCpt) {
-      training_type = "cpt";
-    }
+    // Map form data into the new deterministic engine's input shape
+    const unemploymentDays =
+      typeof formData.unemploymentDaysUsed === "number"
+        ? formData.unemploymentDaysUsed
+        : formData.unemploymentDaysUsed === ""
+        ? 0
+        : Number(formData.unemploymentDaysUsed) || 0;
+
+    const stemEligibleBool =
+      formData.stemEligible === "yes"
+        ? true
+        : formData.stemEligible === "no"
+        ? false
+        : null;
+
+    let stemStatus: ImmigrationCaseInput["stemApplicationStatus"] = undefined;
+    if (formData.stemApplicationStatus === "yes") stemStatus = "approved";
+    else if (formData.stemApplicationStatus === "pending") stemStatus = "pending";
+    else if (formData.stemApplicationStatus === "no") stemStatus = "denied";
+
+    const sevisTerminatedBool =
+      formData.sevisTerminatedBefore === "yes"
+        ? true
+        : formData.sevisTerminatedBefore === "no"
+        ? false
+        : null;
 
     return {
-      full_name: formData.fullName,
-      university_name: formData.university,
-      country_of_origin: formData.country,
-      visa_type: "F-1",
+      fullName: formData.fullName,
+      university: formData.university,
+      country: formData.country,
 
-      is_on_f1: true,
-      inside_us: true,
-      current_stage: formData.currentStage,
+      currentStage: formData.currentStage,
 
-      program_start_date: formData.programStart,
-      program_end_date: formData.programEnd,
-      enrollment_status: formData.enrollmentStatus,
-      planning_course_changes: formData.courseChanges,
+      programStart: formData.programStart,
+      programEnd: formData.programEnd,
 
-      on_campus_hours: formData.workHours,
-      training_type,
+      enrollmentStatus: formData.enrollmentStatus,
 
-      opt_start_date: formData.optStart,
-      opt_end_date: formData.optEnd,
+      workHours: formData.workHours,
+      courseChanges: formData.courseChanges,
+      usingCpt: formData.currentStage === "cpt" || formData.usingCpt,
 
-      using_cpt: formData.currentStage === "cpt" || formData.usingCpt,
-      cpt_hours: formData.cptHours,
-      cpt_type: formData.cptType,
+      cptHours: formData.cptHours,
+      cptType: formData.cptType || undefined,
 
-      stem_eligible: formData.stemEligible,
-      stem_application_status: formData.stemApplicationStatus,
+      optStart: formData.optStart || undefined,
+      optEnd: formData.optEnd || undefined,
 
-      employed_in_authorized_job: formData.employedInAuthorizedJob ?? false,
-      planning_employer_change: formData.changeEmployer ?? false,
+      unemploymentDaysUsed: unemploymentDays,
 
-      unemployment_days_used:
-        typeof formData.unemploymentDaysUsed === "number"
-          ? formData.unemploymentDaysUsed
-          : formData.unemploymentDaysUsed === ""
-          ? 0
-          : Number(formData.unemploymentDaysUsed) || 0,
-      travel_plans_next_90_days: formData.travelPlans,
-      received_uscis_notices: formData.receivedUSCISNotices,
-      unauthorized_work: formData.unauthorizedWork,
-      sevis_terminated_before: formData.sevisTerminatedBefore,
+      employedInAuthorizedJob: formData.employedInAuthorizedJob ?? undefined,
+      changeEmployer: formData.changeEmployer ?? undefined,
+
+      stemEligible: stemEligibleBool,
+      stemApplicationStatus: stemStatus,
+
+      travelPlans: formData.travelPlans,
+      receivedUSCISNotices: formData.receivedUSCISNotices,
+      unauthorizedWork: formData.unauthorizedWork,
+      sevisTerminatedBefore: sevisTerminatedBool,
     };
   };
 
   const handleSubmit = async () => {
+    if (!user) {
+      setSubmitError("Please sign in first to save your analysis.");
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError(null);
 
     const immigration_case_input = buildImmigrationCaseInput();
 
     try {
-      const response = await fetch(COMPLIANCE_ANALYZE_API, {
+      const response = await fetch(CASES_SUBMIT_API, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ immigration_case_input }),
+        body: JSON.stringify({
+          clerkUserId: user.id,
+          immigration_case_input,
+        }),
       });
 
       if (!response.ok) {
@@ -287,8 +301,17 @@ export default function Onboarding() {
   if (showRoleSelection) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
-        <div className="fixed top-4 right-4 z-10">
+        <div className="fixed top-4 right-4 z-10 flex items-center gap-3">
           <ThemeToggle />
+          <Show when="signed-out">
+            <div className="flex items-center gap-2">
+              <SignInButton>Log in</SignInButton>
+              <SignUpButton>Sign up</SignUpButton>
+            </div>
+          </Show>
+          <Show when="signed-in">
+            <UserButton />
+          </Show>
         </div>
         <div className="w-full max-w-4xl">
           {/* Logo and Title */}
@@ -310,24 +333,25 @@ export default function Onboarding() {
             animate={{ opacity: 1, y: 0 }}
             className="grid grid-cols-1 md:grid-cols-2 gap-6"
           >
-            <button
-              onClick={() => setShowRoleSelection(false)}
-              className="group bg-card border-2 border-border hover:border-primary rounded-lg p-8 transition-all hover:scale-[1.02]"
-            >
-              <div className="flex flex-col items-center text-center">
-                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                  <GraduationCap className="w-10 h-10 text-primary" />
+            <SignInButton mode="modal">
+              <button
+                className="group bg-card border-2 border-border hover:border-primary rounded-lg p-8 transition-all hover:scale-[1.02]"
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                    <GraduationCap className="w-10 h-10 text-primary" />
+                  </div>
+                  <h2 className="text-2xl font-semibold mb-2">I'm a Student</h2>
+                  <p className="text-muted-foreground mb-4">
+                    Track your visa compliance, get personalized alerts, and chat with AI advisor
+                  </p>
+                  <div className="flex items-center gap-2 text-primary font-medium">
+                    <span>Get Started</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </div>
                 </div>
-                <h2 className="text-2xl font-semibold mb-2">I'm a Student</h2>
-                <p className="text-muted-foreground mb-4">
-                  Track your visa compliance, get personalized alerts, and chat with AI advisor
-                </p>
-                <div className="flex items-center gap-2 text-primary font-medium">
-                  <span>Get Started</span>
-                  <ArrowRight className="w-4 h-4" />
-                </div>
-              </div>
-            </button>
+              </button>
+            </SignInButton>
 
             <button
               onClick={() => navigate("/dso")}
@@ -391,42 +415,38 @@ export default function Onboarding() {
 
         {/* Form Card */}
         <div className="bg-card border border-border rounded-lg p-8">
-          {analysisResult ? (
+              {analysisResult ? (
             <div className="space-y-6">
               <h2 className="text-2xl font-semibold mb-2">Your compliance analysis</h2>
               <p className="text-muted-foreground">
                 Based on your answers, here is a snapshot of your current F-1/J-1 compliance position.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {"risk_score" in analysisResult && (
+                {typeof analysisResult.riskScore === "number" && (
                   <div className="p-4 rounded-lg bg-muted/60">
                     <div className="text-xs font-medium text-muted-foreground uppercase mb-1">Risk score</div>
-                    <div className="text-2xl font-semibold">
-                      {typeof analysisResult.risk_score === "number" ? analysisResult.risk_score.toFixed(1) : "--"}
-                    </div>
+                    <div className="text-2xl font-semibold">{analysisResult.riskScore}</div>
                   </div>
                 )}
-                {"current_stage" in analysisResult && (
+                {analysisResult.riskLevel && (
                   <div className="p-4 rounded-lg bg-muted/60">
                     <div className="text-xs font-medium text-muted-foreground uppercase mb-1">Current stage</div>
-                    <div className="text-base font-medium">
-                      {analysisResult.current_stage || "Not specified"}
-                    </div>
+                    <div className="text-base font-medium">{analysisResult.riskLevel}</div>
                   </div>
                 )}
-                {"unemployment_usage" in analysisResult && (
+                {Array.isArray(analysisResult.flags) && analysisResult.flags.length > 0 && (
                   <div className="p-4 rounded-lg bg-muted/60">
-                    <div className="text-xs font-medium text-muted-foreground uppercase mb-1">Unemployment usage</div>
+                    <div className="text-xs font-medium text-muted-foreground uppercase mb-1">Flags</div>
                     <div className="text-base font-medium">
-                      {analysisResult.unemployment_usage ?? "--"} days
+                      {analysisResult.flags.map((f) => f.code).join(", ")}
                     </div>
                   </div>
                 )}
-                {"next_deadline" in analysisResult && (
+                {analysisResult.deadlines && (
                   <div className="p-4 rounded-lg bg-muted/60">
                     <div className="text-xs font-medium text-muted-foreground uppercase mb-1">Next deadline</div>
                     <div className="text-base font-medium">
-                      {analysisResult.next_deadline || "No upcoming deadline detected"}
+                      {analysisResult.deadlines.nextDeadline || "No upcoming deadline detected"}
                     </div>
                   </div>
                 )}
