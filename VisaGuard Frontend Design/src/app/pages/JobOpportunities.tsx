@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Briefcase, Search, FileText } from "lucide-react";
+import { Shield, LayoutDashboard, Bot, User, Bell, Briefcase, Search, FileText } from "lucide-react";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { SidebarUserFooter } from "../components/SidebarUserFooter";
 
 type Job = {
   id: number;
@@ -42,7 +43,6 @@ const FILTERS = ["All", "CPT", "OPT", "Remote", "On-site", "Hybrid"];
 const VISA_FILTERS = ["All Visas", "F-1", "J-1", "M-1"];
 
 function Sidebar({ activeNav, onNav }: { activeNav: string; onNav: (path: string, nav: string) => void }) {
-  const navigate = useNavigate();
   return (
     <aside className="w-64 bg-card border-r border-border flex flex-col">
       <div className="p-6 border-b border-border flex items-center justify-between gap-2">
@@ -74,12 +74,7 @@ function Sidebar({ activeNav, onNav }: { activeNav: string; onNav: (path: string
           </button>
         ))}
       </nav>
-      <div className="p-4 border-t border-border">
-        <button onClick={() => navigate("/")} className="w-full flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground">
-          <LogOut className="w-4 h-4" />
-          <span className="text-sm">Sign Out</span>
-        </button>
-      </div>
+      <SidebarUserFooter />
     </aside>
   );
 }

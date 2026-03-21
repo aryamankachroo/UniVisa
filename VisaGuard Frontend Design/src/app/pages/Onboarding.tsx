@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
-import { Show, SignInButton, SignUpButton, UserButton, useUser } from "@clerk/react";
+import { Show, SignInButton, UserButton, useClerk, useUser } from "@clerk/react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -13,6 +13,10 @@ import { ThemeToggle } from "../components/ThemeToggle";
 const API_BASE = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "http://localhost:8000";
 const UNIVERSITIES_API = `${API_BASE}/universities`;
 const CASES_SUBMIT_API = `${API_BASE}/api/cases/submit`;
+
+function casesMeUrl(clerkUserId: string) {
+  return `${API_BASE}/api/cases/me?clerk_user_id=${encodeURIComponent(clerkUserId)}`;
+}
 
 const COUNTRIES = [
   "Afghanistan", "Albania", "Algeria", "Argentina", "Australia", "Austria", "Bangladesh", "Belgium", "Brazil", "Bulgaria",
@@ -120,8 +124,11 @@ interface FormData {
 
 export default function Onboarding() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isLoaded, isSignedIn, user } = useUser();
+  const { openSignIn } = useClerk();
   const [showRoleSelection, setShowRoleSelection] = useState(true);
+  const [studentFlowStarted, setStudentFlowStarted] = useState(false);
   const [step, setStep] = useState(1);
   const TOTAL_STEPS = 5;
   const [formData, setFormData] = useState<FormData>({
@@ -164,6 +171,9 @@ export default function Onboarding() {
   const [universitiesLoading, setUniversitiesLoading] = useState(false);
   const [universitiesError, setUniversitiesError] = useState<string | null>(null);
 
+  /** False while checking whether this signed-in user already has a saved case (skip questionnaire). */
+  const [savedCaseLookupDone, setSavedCaseLookupDone] = useState(false);
+
   useEffect(() => {
     fetch(UNIVERSITIES_API)
       .then((res) => {
@@ -180,12 +190,75 @@ export default function Onboarding() {
       });
   }, []);
 
-  // Once Clerk finishes loading and user is signed in, automatically go to questionnaire
+  // Returning users: backend already has questionnaire + risk → go straight to dashboard.
   useEffect(() => {
-    if (isLoaded && isSignedIn) {
-      setShowRoleSelection(false);
+    if (!isLoaded) return;
+
+    if (!isSignedIn || !user) {
+      setSavedCaseLookupDone(true);
+      return;
     }
-  }, [isLoaded, isSignedIn]);
+
+    let cancelled = false;
+    setSavedCaseLookupDone(false);
+
+    fetch(casesMeUrl(user.id))
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { risk?: unknown } | null) => {
+        if (cancelled || !data?.risk) return;
+        navigate("/dashboard", { replace: true });
+      })
+      .catch(() => {
+        /* stay on onboarding if API unreachable */
+      })
+      .finally(() => {
+        if (!cancelled) setSavedCaseLookupDone(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, isSignedIn, user?.id, navigate]);
+
+  // Keep role selection as an explicit choice (no auto-redirect).
+  // However, if the user clicked "I'm a Student" and then completed sign-in,
+  // automatically continue into the questionnaire.
+  useEffect(() => {
+    if (studentFlowStarted && isLoaded && isSignedIn) {
+      goToStudentStep(1);
+      setStudentFlowStarted(false);
+    }
+  }, [studentFlowStarted, isLoaded, isSignedIn]);
+
+  // Sync splash/questionnaire + step with URL so browser back/forward works.
+  useEffect(() => {
+    const sp = new URLSearchParams(location.search);
+    const view = sp.get("view"); // "student" | null
+    const stepParam = sp.get("step");
+
+    if (view === "student") {
+      setShowRoleSelection(false);
+      const n = Number(stepParam);
+      if (Number.isFinite(n) && n >= 1 && n <= TOTAL_STEPS) {
+        setStep(n);
+      } else {
+        setStep(1);
+      }
+    } else {
+      setShowRoleSelection(true);
+      setStep(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
+
+  const goToStudentStep = (nextStep: number, replace = false) => {
+    const s = Math.max(1, Math.min(TOTAL_STEPS, nextStep));
+    navigate({ pathname: "/", search: `?view=student&step=${s}` }, { replace });
+  };
+
+  const goToRoleSelection = (replace = false) => {
+    navigate({ pathname: "/", search: "" }, { replace });
+  };
 
   const updateField = (field: keyof FormData, value: FormData[typeof field]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -287,16 +360,24 @@ export default function Onboarding() {
       setAnalysisResult(data);
       localStorage.setItem("immigration_case_input", JSON.stringify(immigration_case_input));
       localStorage.setItem("immigration_case_analysis", JSON.stringify(data));
+      navigate("/dashboard", { replace: true });
     } catch (error) {
       console.error("Failed to analyze compliance", error);
       setSubmitError("We could not analyze your compliance right now. Please try again in a few minutes.");
     } finally {
       setSubmitting(false);
-      navigate("/dashboard");
     }
   };
 
   const progressPercent = (step / TOTAL_STEPS) * 100;
+
+  if (!isLoaded || (isSignedIn && !savedCaseLookupDone)) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      </div>
+    );
+  }
 
   if (showRoleSelection) {
     return (
@@ -306,7 +387,6 @@ export default function Onboarding() {
           <Show when="signed-out">
             <div className="flex items-center gap-2">
               <SignInButton>Log in</SignInButton>
-              <SignUpButton>Sign up</SignUpButton>
             </div>
           </Show>
           <Show when="signed-in">
@@ -333,25 +413,34 @@ export default function Onboarding() {
             animate={{ opacity: 1, y: 0 }}
             className="grid grid-cols-1 md:grid-cols-2 gap-6"
           >
-            <SignInButton mode="modal">
-              <button
-                className="group bg-card border-2 border-border hover:border-primary rounded-lg p-8 transition-all hover:scale-[1.02]"
-              >
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                    <GraduationCap className="w-10 h-10 text-primary" />
-                  </div>
-                  <h2 className="text-2xl font-semibold mb-2">I'm a Student</h2>
-                  <p className="text-muted-foreground mb-4">
-                    Track your visa compliance, get personalized alerts, and chat with AI advisor
-                  </p>
-                  <div className="flex items-center gap-2 text-primary font-medium">
-                    <span>Get Started</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </div>
+            <button
+              onClick={() => {
+                if (isSignedIn) {
+                  goToStudentStep(1);
+                  return;
+                }
+                setStudentFlowStarted(true);
+                openSignIn({}).catch(() => {
+                  // If modal fails to open for any reason, keep the splash visible.
+                  setStudentFlowStarted(false);
+                });
+              }}
+              className="group bg-card border-2 border-border hover:border-primary rounded-lg p-8 transition-all hover:scale-[1.02]"
+            >
+              <div className="flex flex-col items-center text-center">
+                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                  <GraduationCap className="w-10 h-10 text-primary" />
                 </div>
-              </button>
-            </SignInButton>
+                <h2 className="text-2xl font-semibold mb-2">I'm a Student</h2>
+                <p className="text-muted-foreground mb-4">
+                  Track your visa compliance, get personalized alerts, and chat with AI advisor
+                </p>
+                <div className="flex items-center gap-2 text-primary font-medium">
+                  <span>Get Started</span>
+                  <ArrowRight className="w-4 h-4" />
+                </div>
+              </div>
+            </button>
 
             <button
               onClick={() => navigate("/dso")}
@@ -948,13 +1037,18 @@ export default function Onboarding() {
           <div className="flex justify-between mt-8 pt-6 border-t border-border">
             <Button
               variant="outline"
-              onClick={() => setStep((s) => Math.max(1, s - 1))}
-              disabled={step === 1}
+              onClick={() => {
+                if (step <= 1) {
+                  goToRoleSelection();
+                } else {
+                  goToStudentStep(step - 1);
+                }
+              }}
             >
               Back
             </Button>
             {step < TOTAL_STEPS ? (
-              <Button onClick={() => setStep((s) => Math.min(TOTAL_STEPS, s + 1))} className="bg-primary">
+              <Button onClick={() => goToStudentStep(step + 1)} className="bg-primary">
                 Continue
               </Button>
             ) : (

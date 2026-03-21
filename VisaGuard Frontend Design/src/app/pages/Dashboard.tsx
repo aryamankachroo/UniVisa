@@ -1,22 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { useClerk, useUser } from "@clerk/react";
-import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Briefcase, Search, FileText } from "lucide-react";
+import { useUser } from "@clerk/react";
+import { Shield, LayoutDashboard, Bot, User, Bell, Briefcase, Search, FileText } from "lucide-react";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { SidebarUserFooter } from "../components/SidebarUserFooter";
 import { RiskScoreGauge } from "../components/RiskScoreGauge";
 import { RiskBadge } from "../components/RiskBadge";
 import { DeadlineCountdown } from "../components/DeadlineCountdown";
 import { Button } from "../components/ui/button";
 import { motion } from "motion/react";
 
-// Demo data fallback (used until Supabase-backed data is available)
+// Demo data fallback for widgets when no saved case is loaded (no fake user identity)
 const DEMO_DATA = {
-  student: {
-    name: "Riya Sharma",
-    university: "Georgia Tech",
-    riskScore: 74,
-    lastUpdated: new Date().toLocaleString(),
-  },
   activeRisks: [
     {
       id: 1,
@@ -47,10 +42,40 @@ const DEMO_DATA = {
   },
 };
 
+const HIGH_SEVERITY_FLAGS = new Set([
+  "unauthorized_work",
+  "sevis_termination_history",
+  "opt_unemployment_exceeded",
+  "enrollment_violation",
+  "cpt_enrollment_violation",
+  "invalid_stem_extension",
+  "cpt_hours_violation",
+]);
+
+const MEDIUM_SEVERITY_FLAGS = new Set([
+  "opt_unemployment_warning",
+  "uscis_notice_received",
+  "on_campus_work_violation",
+  "reduced_course_load_review",
+  "stem_eligibility_unknown",
+  "travel_risk",
+]);
+
+function severityForFlagCode(code: string): "high" | "medium" | "low" {
+  if (HIGH_SEVERITY_FLAGS.has(code)) return "high";
+  if (MEDIUM_SEVERITY_FLAGS.has(code)) return "medium";
+  return "low";
+}
+
+function titleForFlag(flag: { code: string; description?: string | null }) {
+  const d = flag.description?.trim();
+  if (d) return d;
+  return flag.code.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user, isLoaded } = useUser();
-  const { signOut } = useClerk();
   const [activeNav, setActiveNav] = useState("dashboard");
   const [dashboardData, setDashboardData] = useState<{
     profile: any;
@@ -78,35 +103,47 @@ export default function Dashboard() {
       });
   }, [API_BASE, isLoaded, user]);
 
-  // Prefer Clerk name, then Supabase profile, then demo
-  const clerkName =
-    user && (user.fullName || [user.firstName, user.lastName].filter(Boolean).join(" ").trim()) || null;
+  const hasSavedRisk = dashboardData?.risk != null && typeof dashboardData.risk.riskScore === "number";
+  const riskScore = hasSavedRisk ? dashboardData!.risk.riskScore : 0;
+  const lastUpdated = hasSavedRisk ? new Date().toLocaleString() : "—";
 
-  // Load last questionnaire from localStorage as another fallback (for university)
-  const [localCase, setLocalCase] = useState<any | null>(null);
+  const savedRisk = dashboardData?.risk;
+  const apiFlags = savedRisk?.flags;
+  const useBackendRisks = savedRisk != null && Array.isArray(apiFlags);
+  const activeRisksFromApi = useBackendRisks
+    ? apiFlags.map((f: { code: string; description?: string | null }, i: number) => ({
+        id: i,
+        title: titleForFlag(f),
+        description:
+          f.description?.trim() ||
+          "This item was raised by the compliance check from your saved questionnaire.",
+        severity: severityForFlagCode(f.code) as "high" | "medium" | "low",
+      }))
+    : null;
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("immigration_case_input");
-      if (raw) {
-        setLocalCase(JSON.parse(raw));
-      }
-    } catch {
-      setLocalCase(null);
-    }
-  }, []);
+  const activeRisks = activeRisksFromApi ?? DEMO_DATA.activeRisks;
+  const showBackendRiskEmpty = Boolean(useBackendRisks && activeRisksFromApi && activeRisksFromApi.length === 0);
 
-  const studentName =
-    clerkName ?? dashboardData?.profile?.full_name ?? DEMO_DATA.student.name;
+  const deadlinesPayload = savedRisk?.deadlines;
+  const nextDeadlineRaw = deadlinesPayload?.nextDeadline;
+  const daysUntil = deadlinesPayload?.daysUntilNextDeadline;
+  const hasBackendDeadline =
+    savedRisk != null && nextDeadlineRaw != null && daysUntil != null;
 
-  const studentUniversity =
-    dashboardData?.profile?.university ??
-    localCase?.university_name ??
-    localCase?.university ??
-    DEMO_DATA.student.university;
-  const riskScore = dashboardData?.risk?.riskScore ?? DEMO_DATA.student.riskScore;
-  const lastUpdated =
-    dashboardData && dashboardData.risk ? new Date().toLocaleString() : DEMO_DATA.student.lastUpdated;
+  const upcomingDeadlines =
+    savedRisk == null
+      ? DEMO_DATA.upcomingDeadlines
+      : hasBackendDeadline
+        ? [
+            {
+              title: "Next compliance deadline",
+              date: new Date(String(nextDeadlineRaw)),
+              days: typeof daysUntil === "number" ? daysUntil : Number(daysUntil),
+            },
+          ]
+        : [];
+
+  const showBackendDeadlineEmpty = savedRisk != null && !hasBackendDeadline;
 
   const handleNavigation = (path: string, nav: string) => {
     setActiveNav(nav);
@@ -200,21 +237,7 @@ export default function Dashboard() {
           </button>
         </nav>
 
-        <div className="p-4 border-t border-border">
-          <div className="px-4 py-3">
-            <div className="font-medium">{studentName}</div>
-            <div className="text-sm text-muted-foreground">
-              {studentUniversity}
-            </div>
-          </div>
-          <button
-            onClick={() => signOut({ redirectUrl: "/" })}
-            className="w-full flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground mt-2"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="text-sm">Sign Out</span>
-          </button>
-        </div>
+        <SidebarUserFooter />
       </aside>
 
       {/* Main Content */}
@@ -248,20 +271,26 @@ export default function Dashboard() {
             >
               <h3 className="text-lg font-semibold mb-4">Active Risks</h3>
               <div className="space-y-3">
-                {DEMO_DATA.activeRisks.map((risk) => (
-                  <div
-                    key={risk.id}
-                    className="p-3 rounded-lg border border-border bg-background"
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <span className="text-sm font-medium">{risk.title}</span>
-                      <RiskBadge level={risk.severity} />
+                {showBackendRiskEmpty ? (
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    No active compliance flags from your last analysis.
+                  </p>
+                ) : (
+                  activeRisks.map((risk) => (
+                    <div
+                      key={risk.id}
+                      className="p-3 rounded-lg border border-border bg-background"
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <span className="text-sm font-medium">{risk.title}</span>
+                        <RiskBadge level={risk.severity} />
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        {risk.description}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      {risk.description}
-                    </p>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </motion.div>
 
@@ -274,14 +303,20 @@ export default function Dashboard() {
             >
               <h3 className="text-lg font-semibold mb-4">Upcoming Deadlines</h3>
               <div className="space-y-3">
-                {DEMO_DATA.upcomingDeadlines.map((deadline, idx) => (
-                  <DeadlineCountdown
-                    key={idx}
-                    title={deadline.title}
-                    date={deadline.date}
-                    daysRemaining={deadline.days}
-                  />
-                ))}
+                {showBackendDeadlineEmpty ? (
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    No upcoming deadline was computed from your saved profile.
+                  </p>
+                ) : (
+                  upcomingDeadlines.map((deadline, idx) => (
+                    <DeadlineCountdown
+                      key={idx}
+                      title={deadline.title}
+                      date={deadline.date}
+                      daysRemaining={deadline.days}
+                    />
+                  ))
+                )}
               </div>
             </motion.div>
 
