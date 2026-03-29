@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from models.student import StudentProfile, VisaType, EnrollmentStatus
-from routers import student, chat, dso, cpt
+from routers import student, chat, dso, cpt, jobs
 
 app = FastAPI(
     title="UniVisa API",
@@ -46,6 +46,7 @@ app.include_router(student.router)
 app.include_router(chat.router)
 app.include_router(dso.router)
 app.include_router(cpt.router)
+app.include_router(jobs.router)
 
 
 def _seed_demo_student() -> None:

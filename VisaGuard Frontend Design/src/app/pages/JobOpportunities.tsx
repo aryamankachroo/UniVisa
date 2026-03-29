@@ -1,45 +1,47 @@
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router";
-import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Briefcase, Search, FileText } from "lucide-react";
+import {
+  Shield, LayoutDashboard, Bot, User, Bell, LogOut,
+  Briefcase, Search, FileText, RefreshCw, ExternalLink,
+  BookmarkPlus, BookmarkCheck, ChevronDown, ChevronUp,
+  AlertTriangle, Wifi, WifiOff, SlidersHorizontal,
+} from "lucide-react";
 import { ThemeToggle } from "../components/ThemeToggle";
 
-type Job = {
-  id: number;
+// ─── API base (same pattern as your existing api.ts) ──────────────────────────
+const API_BASE =
+  (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ??
+  "http://localhost:8000";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type WorkAuth = "F-1 CPT" | "F-1 OPT" | "OPT STEM Extension" | "J-1" | "H-1B Sponsor";
+type JobType = "Internship" | "Full-time" | "Co-op" | "Part-time" | "Contract";
+type Remote = "Remote" | "Hybrid" | "On-site";
+
+interface Job {
+  id: string;
   company: string;
-  logo: string;
-  logoColor: string;
-  logoBg: string;
   role: string;
-  type: string;
+  type: JobType;
   location: string;
-  remote: string;
-  duration: string;
-  pay: string;
-  deadline: string;
+  remote: Remote;
+  pay?: string | null;
+  deadline?: string | null;
   tags: string[];
-  visas: string[];
+  visaTypes: WorkAuth[];
+  eVerify: boolean;
+  sponsorship: boolean;
   description: string;
-  evVerify: boolean;
-  spotsLeft: number;
-};
+  applyUrl?: string;
+  source: string;
+  postedAt?: string;
+}
 
-const JOBS: Job[] = [
-  { id: 1, company: "Google", logo: "G", logoColor: "#4285F4", logoBg: "#e8f0fe", role: "Software Engineering Intern", type: "CPT", location: "Mountain View, CA", remote: "Hybrid", duration: "12 weeks", pay: "$8,500/mo", deadline: "Mar 15, 2026", tags: ["Python", "ML", "Distributed Systems"], visas: ["F-1", "J-1"], description: "Work on core Google infrastructure. CPT authorization required before start date. Must maintain full-time enrollment.", evVerify: true, spotsLeft: 3 },
-  { id: 2, company: "Microsoft", logo: "M", logoColor: "#00a4ef", logoBg: "#e6f4ff", role: "Data Science Intern", type: "CPT", location: "Redmond, WA", remote: "Hybrid", duration: "16 weeks", pay: "$7,800/mo", deadline: "Mar 28, 2026", tags: ["Python", "Azure", "Power BI"], visas: ["F-1", "J-1", "M-1"], description: "Join the Azure AI team. E-Verify employer. CPT paperwork assistance provided by HR.", evVerify: true, spotsLeft: 5 },
-  { id: 3, company: "Meta", logo: "M", logoColor: "#0081FB", logoBg: "#e7f0ff", role: "Product Intern — AR/VR", type: "CPT", location: "Menlo Park, CA", remote: "On-site", duration: "12 weeks", pay: "$9,000/mo", deadline: "Feb 28, 2026", tags: ["Product", "UX Research", "AR"], visas: ["F-1", "J-1"], description: "Work on the Reality Labs product team. Must have CPT authorization from DSO before first day.", evVerify: true, spotsLeft: 2 },
-  { id: 4, company: "Apple", logo: "A", logoColor: "#555", logoBg: "#f5f5f7", role: "ML Research Intern", type: "CPT", location: "Cupertino, CA", remote: "On-site", duration: "16 weeks", pay: "$9,200/mo", deadline: "Mar 10, 2026", tags: ["PyTorch", "CoreML", "Research"], visas: ["F-1"], description: "Join Apple AI/ML team working on on-device intelligence. F-1 CPT only. Strict confidentiality agreement.", evVerify: true, spotsLeft: 1 },
-  { id: 5, company: "Amazon", logo: "A", logoColor: "#FF9900", logoBg: "#fff8ee", role: "SDE Intern", type: "CPT / OPT", location: "Seattle, WA", remote: "Hybrid", duration: "12 weeks", pay: "$8,200/mo", deadline: "Apr 1, 2026", tags: ["Java", "AWS", "System Design"], visas: ["F-1", "J-1"], description: "Build scalable systems on AWS. Accepts both CPT and OPT. Relocation stipend included.", evVerify: true, spotsLeft: 8 },
-  { id: 6, company: "NVIDIA", logo: "N", logoColor: "#76b900", logoBg: "#f0fae6", role: "Deep Learning Research Intern", type: "CPT", location: "Santa Clara, CA", remote: "On-site", duration: "20 weeks", pay: "$9,500/mo", deadline: "Mar 20, 2026", tags: ["CUDA", "PyTorch", "LLMs"], visas: ["F-1", "J-1"], description: "Work directly with NVIDIA Research on next-gen GPU architectures and LLM training pipelines.", evVerify: true, spotsLeft: 2 },
-  { id: 7, company: "Goldman Sachs", logo: "GS", logoColor: "#6699FF", logoBg: "#eef2ff", role: "Quantitative Finance Intern", type: "CPT / OPT", location: "New York, NY", remote: "On-site", duration: "10 weeks", pay: "$11,000/mo", deadline: "Feb 20, 2026", tags: ["Python", "Quant", "Risk Modeling"], visas: ["F-1", "J-1"], description: "Summer analyst role in Securities division. One of the highest-paying CPT/OPT positions available to international students.", evVerify: true, spotsLeft: 4 },
-  { id: 8, company: "JPMorgan Chase", logo: "JP", logoColor: "#005EB8", logoBg: "#e6f0fb", role: "Software Engineer Intern", type: "CPT / OPT", location: "New York, NY", remote: "Hybrid", duration: "10 weeks", pay: "$8,900/mo", deadline: "Mar 5, 2026", tags: ["Java", "Cloud", "FinTech"], visas: ["F-1", "J-1", "M-1"], description: "Build next-gen banking infrastructure. Active OPT/CPT required before start. Strong mentorship program.", evVerify: true, spotsLeft: 6 },
-  { id: 9, company: "McKinsey & Co.", logo: "Mc", logoColor: "#2D6A4F", logoBg: "#e8f5ee", role: "Business Analyst Intern", type: "CPT", location: "Chicago, IL", remote: "Hybrid", duration: "10 weeks", pay: "$7,500/mo", deadline: "Mar 1, 2026", tags: ["Strategy", "Analytics", "MBA"], visas: ["F-1", "J-1"], description: "Work on Fortune 500 client engagements. CPT requires curriculum integration — coordinate with your academic advisor first.", evVerify: true, spotsLeft: 3 },
-  { id: 10, company: "Tesla", logo: "T", logoColor: "#CC0000", logoBg: "#fce8e8", role: "Autopilot ML Intern", type: "CPT", location: "Palo Alto, CA", remote: "On-site", duration: "16 weeks", pay: "$8,700/mo", deadline: "Apr 10, 2026", tags: ["Computer Vision", "PyTorch", "C++"], visas: ["F-1"], description: "Work on Autopilot perception systems. Fast-paced environment. CPT authorization must be obtained before offer acceptance.", evVerify: true, spotsLeft: 2 },
-  { id: 11, company: "Spotify", logo: "S", logoColor: "#1DB954", logoBg: "#e6f9ed", role: "Data Engineering Intern", type: "CPT / OPT", location: "New York, NY", remote: "Hybrid", duration: "12 weeks", pay: "$7,200/mo", deadline: "Apr 15, 2026", tags: ["Spark", "Kafka", "Python"], visas: ["F-1", "J-1"], description: "Build data pipelines for Spotify's recommendation engine. Accepting both CPT and OPT students. International-friendly HR team.", evVerify: true, spotsLeft: 4 },
-  { id: 12, company: "Salesforce", logo: "SF", logoColor: "#00A1E0", logoBg: "#e6f6ff", role: "Full Stack Intern", type: "CPT / OPT", location: "San Francisco, CA", remote: "Remote", duration: "12 weeks", pay: "$7,600/mo", deadline: "Apr 20, 2026", tags: ["React", "Node.js", "Apex"], visas: ["F-1", "J-1", "M-1"], description: "Remote internship. Build on Salesforce Platform. One of the most international-student-friendly companies for visa paperwork support.", evVerify: true, spotsLeft: 7 },
-];
+type WorkAuthParam = "all" | "cpt" | "opt" | "stem_opt" | "h1b";
+type JobTypeParam  = "all" | "internship" | "fulltime" | "coop";
 
-const FILTERS = ["All", "CPT", "OPT", "Remote", "On-site", "Hybrid"];
-const VISA_FILTERS = ["All Visas", "F-1", "J-1", "M-1"];
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 function Sidebar({ activeNav, onNav }: { activeNav: string; onNav: (path: string, nav: string) => void }) {
   const navigate = useNavigate();
@@ -63,14 +65,14 @@ function Sidebar({ activeNav, onNav }: { activeNav: string; onNav: (path: string
           ["/policy-alerts", "policy", FileText, "Policy Alerts"],
         ].map(([path, nav, Icon, label]) => (
           <button
-            key={path}
-            onClick={() => onNav(path as string, nav)}
+            key={path as string}
+            onClick={() => onNav(path as string, nav as string)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
               activeNav === nav ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"
             }`}
           >
             <Icon className="w-5 h-5" />
-            <span>{label}</span>
+            <span>{label as string}</span>
           </button>
         ))}
       </nav>
@@ -84,241 +86,480 @@ function Sidebar({ activeNav, onNav }: { activeNav: string; onNav: (path: string
   );
 }
 
+// ─── Visa badge ───────────────────────────────────────────────────────────────
+
+function VisaBadge({ visa }: { visa: WorkAuth }) {
+  const colors: Record<WorkAuth, string> = {
+    "F-1 CPT":            "bg-blue-500/10    text-blue-600    dark:text-blue-400    border-blue-500/20",
+    "F-1 OPT":            "bg-violet-500/10  text-violet-600  dark:text-violet-400  border-violet-500/20",
+    "OPT STEM Extension": "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    "J-1":                "bg-amber-500/10   text-amber-600   dark:text-amber-400   border-amber-500/20",
+    "H-1B Sponsor":       "bg-primary/10     text-primary                           border-primary/20",
+  };
+  return (
+    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold border ${colors[visa] ?? "bg-muted/50 text-muted-foreground border-border"}`}>
+      {visa}
+    </span>
+  );
+}
+
+// ─── Job card ─────────────────────────────────────────────────────────────────
+
+function JobCard({ job, saved, onToggleSave }: { job: Job; saved: boolean; onToggleSave: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const typeColor =
+    job.type === "Full-time"  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" :
+    job.type === "Co-op"      ? "bg-amber-500/15   text-amber-600   dark:text-amber-400   border-amber-500/30"   :
+    job.type === "Contract"   ? "bg-rose-500/15    text-rose-600    dark:text-rose-400    border-rose-500/30"    :
+                                "bg-primary/15     text-primary                           border-primary/30";
+
+  return (
+    <div className="rounded-xl border bg-card overflow-hidden transition-all hover:border-primary/40 hover:shadow-sm flex flex-col">
+      <div className="p-4 flex-1">
+        {/* Header */}
+        <div className="flex justify-between items-start gap-2 mb-3">
+          <div className="min-w-0">
+            <div className="font-semibold text-foreground text-sm leading-tight">{job.role}</div>
+            <div className="text-muted-foreground text-xs mt-0.5">{job.company}</div>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onToggleSave(); }}
+            className={`shrink-0 p-1 rounded-md transition-colors ${saved ? "text-amber-500" : "text-muted-foreground hover:text-amber-500"}`}
+          >
+            {saved ? <BookmarkCheck className="w-4 h-4" /> : <BookmarkPlus className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {/* Type + location + remote chips */}
+        <div className="flex gap-1.5 flex-wrap mb-2">
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold border ${typeColor}`}>{job.type}</span>
+          <span className="rounded-full px-2.5 py-0.5 text-xs text-muted-foreground bg-muted/50 border border-border truncate max-w-[130px]">
+            📍 {job.location}
+          </span>
+          <span className={`rounded-full px-2.5 py-0.5 text-xs border ${
+            job.remote === "Remote" ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20" : "bg-muted/50 text-muted-foreground border-border"
+          }`}>
+            {job.remote}
+          </span>
+        </div>
+
+        {/* Pay / date */}
+        {(job.pay || job.postedAt) && (
+          <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
+            {job.pay && (
+              <div>
+                <div className="text-muted-foreground text-xs">Salary</div>
+                <div className="font-bold text-green-600 dark:text-green-400 text-xs">{job.pay}</div>
+              </div>
+            )}
+            {job.postedAt && (
+              <div>
+                <div className="text-muted-foreground text-xs">Posted</div>
+                <div className="font-medium text-foreground text-xs">{job.postedAt}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Skill tags */}
+        {job.tags.length > 0 && (
+          <div className="flex gap-1.5 flex-wrap mb-3">
+            {job.tags.slice(0, 4).map((t) => (
+              <span key={t} className="rounded-md px-2 py-0.5 text-xs text-muted-foreground bg-muted/30 border border-border">{t}</span>
+            ))}
+          </div>
+        )}
+
+        {/* Visa types + badges */}
+        <div className="flex gap-1.5 items-center flex-wrap">
+          {job.visaTypes.length > 0 ? (
+            <>
+              <span className="text-muted-foreground text-xs">Auth:</span>
+              {job.visaTypes.map((v) => <VisaBadge key={v} visa={v} />)}
+            </>
+          ) : (
+            <span className="text-xs text-muted-foreground italic">Verify auth with employer</span>
+          )}
+          <div className="ml-auto flex gap-1">
+            {job.eVerify && (
+              <span className="rounded-md px-2 py-0.5 text-xs bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20">✓ E-Verify</span>
+            )}
+            {job.sponsorship && (
+              <span className="rounded-md px-2 py-0.5 text-xs bg-primary/10 text-primary border border-primary/20">H-1B</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Expand toggle */}
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="w-full py-2.5 px-4 border-t border-border bg-muted/20 text-muted-foreground text-xs flex justify-between items-center hover:bg-primary/10 transition-colors"
+      >
+        <span>{expanded ? "Hide details" : "View details & apply"}</span>
+        {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+      </button>
+
+      {expanded && (
+        <div className="p-4 border-t border-border bg-primary/5">
+          <p className="text-muted-foreground text-sm leading-relaxed mb-3">{job.description}</p>
+
+          {/* CPT checklist */}
+          {job.visaTypes.includes("F-1 CPT") && (
+            <div className="rounded-lg border border-primary/20 bg-primary/10 p-3 mb-3">
+              <div className="text-primary font-semibold text-xs mb-1">📋 CPT Checklist</div>
+              <div className="text-primary/90 text-xs leading-relaxed">
+                1. Confirm role relates to your field of study<br />
+                2. Obtain a written offer letter from {job.company}<br />
+                3. Submit CPT request to your DSO with the offer letter<br />
+                4. Receive updated I-20 with CPT dates before starting<br />
+                5. Complete I-9 verification with {job.company} HR on Day 1
+              </div>
+            </div>
+          )}
+
+          {job.applyUrl ? (
+            <a
+              href={job.applyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full rounded-lg bg-primary text-primary-foreground py-2.5 px-4 text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
+            >
+              Apply Now <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          ) : (
+            <button type="button" className="w-full rounded-lg bg-primary text-primary-foreground py-2.5 px-4 text-sm font-semibold hover:opacity-90 transition-opacity">
+              Apply Now →
+            </button>
+          )}
+          <div className="mt-2 text-xs text-muted-foreground">Source: {job.source}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+function JobSkeleton() {
+  return (
+    <div className="rounded-xl border bg-card overflow-hidden animate-pulse">
+      <div className="p-4 space-y-3">
+        <div className="h-4 bg-muted rounded w-3/4" />
+        <div className="h-3 bg-muted rounded w-1/2" />
+        <div className="flex gap-2"><div className="h-5 bg-muted rounded-full w-16" /><div className="h-5 bg-muted rounded-full w-24" /></div>
+        <div className="flex gap-1.5"><div className="h-5 bg-muted rounded w-12" /><div className="h-5 bg-muted rounded w-16" /></div>
+      </div>
+      <div className="h-9 bg-muted/40 border-t border-border" />
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
+const PRESET_SEARCHES: { label: string; q: string; auth: WorkAuthParam; type: JobTypeParam }[] = [
+  { label: "🤖 ML/AI Internships",       q: "machine learning AI",        auth: "cpt",      type: "internship" },
+  { label: "💻 SWE OPT Full-time",       q: "software engineer",          auth: "opt",      type: "fulltime"   },
+  { label: "📊 Data Science CPT",        q: "data science data analyst",  auth: "cpt",      type: "internship" },
+  { label: "☁️ Cloud / DevOps OPT",     q: "cloud infrastructure DevOps",auth: "opt",      type: "all"        },
+  { label: "🧬 STEM Research",           q: "research scientist engineer", auth: "stem_opt", type: "all"        },
+  { label: "🏦 Finance / Quant",         q: "quantitative finance analyst",auth: "all",     type: "internship" },
+  { label: "🏢 H-1B Sponsors",          q: "software engineer developer", auth: "h1b",      type: "fulltime"   },
+];
+
+const WORK_AUTH_OPTIONS: { label: string; value: WorkAuthParam }[] = [
+  { label: "All Auth",       value: "all"      },
+  { label: "F-1 CPT",       value: "cpt"      },
+  { label: "F-1 OPT",       value: "opt"      },
+  { label: "STEM OPT",      value: "stem_opt" },
+  { label: "H-1B Sponsor",  value: "h1b"      },
+];
+
+const JOB_TYPE_OPTIONS: { label: string; value: JobTypeParam }[] = [
+  { label: "All Types",   value: "all"        },
+  { label: "Internship",  value: "internship" },
+  { label: "Full-time",   value: "fulltime"   },
+  { label: "Co-op",       value: "coop"       },
+];
+
 export default function JobOpportunities() {
   const navigate = useNavigate();
   const [activeNav, setActiveNav] = useState("opportunities");
-  const [activeFilter, setActiveFilter] = useState("All");
-  const [visaFilter, setVisaFilter] = useState("All Visas");
-  const [search, setSearch] = useState("");
-  const [saved, setSaved] = useState<number[]>([]);
-  const [expanded, setExpanded] = useState<number | null>(null);
+  const [q, setQ] = useState("");
+  const [location, setLocation] = useState("");
+  const [workAuth, setWorkAuth] = useState<WorkAuthParam>("all");
+  const [jobType, setJobType] = useState<JobTypeParam>("all");
+  const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
 
-  const filtered = JOBS.filter((j) => {
-    const matchFilter = activeFilter === "All" || j.type.includes(activeFilter) || j.remote === activeFilter;
-    const matchVisa = visaFilter === "All Visas" || j.visas.includes(visaFilter);
-    const matchSearch =
-      search === "" ||
-      j.company.toLowerCase().includes(search.toLowerCase()) ||
-      j.role.toLowerCase().includes(search.toLowerCase()) ||
-      j.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()));
-    return matchFilter && matchVisa && matchSearch;
-  });
+  const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [error, setError] = useState("");
+  const [lastQuery, setLastQuery] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
 
-  const toggleSave = (id: number) => {
-    setSaved((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
+  const handleNav = (path: string, nav: string) => { setActiveNav(nav); navigate(path); };
+
+  const runSearch = useCallback(async (
+    query: string,
+    loc: string,
+    auth: WorkAuthParam,
+    type: JobTypeParam,
+  ) => {
+    if (!query.trim()) return;
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+
+    setStatus("loading");
+    setJobs([]);
+    setLastQuery(query);
+
+    const params = new URLSearchParams({
+      q: query,
+      location: loc,
+      work_auth: auth,
+      job_type: type,
+    });
+
+    try {
+      const res = await fetch(`${API_BASE}/jobs?${params}`, { signal: abortRef.current.signal });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { detail?: string }).detail ?? `Server error ${res.status}`);
+      }
+      const data: Job[] = await res.json();
+      setJobs(data);
+      setStatus("done");
+    } catch (e: unknown) {
+      if (e instanceof Error && e.name === "AbortError") return;
+      setError(e instanceof Error ? e.message : "Search failed");
+      setStatus("error");
+    }
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); runSearch(q, location, workAuth, jobType); };
+
+  const handlePreset = (p: typeof PRESET_SEARCHES[0]) => {
+    setQ(p.q);
+    setWorkAuth(p.auth);
+    setJobType(p.type);
+    runSearch(p.q, location, p.auth, p.type);
   };
 
-  const handleNav = (path: string, nav: string) => {
-    setActiveNav(nav);
-    navigate(path);
-  };
+  const toggleSave = (id: string) =>
+    setSavedIds((prev) => prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]);
 
   return (
     <div className="flex h-screen bg-background">
       <Sidebar activeNav={activeNav} onNav={handleNav} />
+
       <main className="flex-1 overflow-y-auto">
         <div className="p-6 md:p-8 max-w-6xl mx-auto" style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
-          <div className="mb-6">
-            <div className="flex items-center gap-2.5 mb-1.5">
+
+          {/* Header */}
+          <div className="mb-5">
+            <div className="flex items-center gap-2.5 mb-1">
               <span className="text-2xl">💼</span>
               <h1 className="text-2xl font-bold text-foreground tracking-tight">CPT & OPT Opportunities</h1>
-              <span className="rounded-full border border-primary/30 bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                {filtered.length} open
+              <span className="rounded-full border border-green-500/30 bg-green-500/10 px-2.5 py-0.5 text-xs font-semibold text-green-600 dark:text-green-400">
+                Live via Adzuna
               </span>
             </div>
             <p className="text-muted-foreground text-sm">
-              All listings are E-Verify enrolled and accept international students. CPT requires DSO authorization before start date.
+              Real job listings filtered for international students — F-1, OPT, STEM OPT, and H-1B sponsor roles only.
             </p>
           </div>
 
-          <div className="mb-5 flex flex-col gap-3">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by company, role, or skill..."
-              className="w-full rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-            />
-            <div className="flex gap-2 flex-wrap">
-              {FILTERS.map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setActiveFilter(f)}
-                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                    activeFilter === f
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border"
-                  }`}
-                >
-                  {f}
-                </button>
-              ))}
-              <span className="w-px bg-border self-stretch my-1" />
-              {VISA_FILTERS.map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setVisaFilter(f)}
-                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                    visaFilter === f
-                      ? "bg-primary/80 text-primary-foreground"
-                      : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border"
-                  }`}
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 border-l-4 border-l-amber-500 p-4 mb-6 flex gap-2.5">
-            <span className="text-lg shrink-0">⚠️</span>
+          {/* CPT warning */}
+          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 border-l-4 border-l-amber-500 p-4 mb-5 flex gap-2.5">
+            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
             <p className="text-sm text-amber-600 dark:text-amber-400 leading-relaxed m-0">
-              <strong>CPT Reminder:</strong> You must obtain CPT authorization from your DSO BEFORE accepting any offer or starting work. Working without authorization is a deportable SEVIS violation.
+              <strong>CPT Reminder:</strong> Obtain CPT authorization from your DSO BEFORE accepting any offer or starting work. Unauthorized work is a deportable SEVIS violation.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filtered.map((job) => (
-              <div
-                key={job.id}
-                className="rounded-xl border bg-card overflow-hidden transition-all cursor-pointer hover:border-primary/30"
-                style={{ borderColor: expanded === job.id ? "hsl(var(--primary) / 0.4)" : undefined }}
+          {/* Search form */}
+          <form onSubmit={handleSubmit} className="mb-4 space-y-2">
+            <div className="flex gap-2">
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder='Role or skill — e.g. "software engineer" or "data analyst"'
+                className="flex-1 rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+              />
+              <button
+                type="button"
+                onClick={() => setShowFilters(!showFilters)}
+                className={`rounded-xl px-3.5 py-3 border text-sm transition-colors flex items-center gap-1.5 ${showFilters ? "border-primary bg-primary/10 text-primary" : "border-border bg-muted/50 text-muted-foreground hover:bg-muted"}`}
               >
-                <div className="p-4">
-                  <div className="flex justify-between items-start gap-2 mb-3">
-                    <div className="flex gap-3 items-center min-w-0">
-                      <div
-                        className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center font-extrabold text-sm border border-white/10"
-                        style={{ background: job.logoBg, color: job.logoColor }}
+                <SlidersHorizontal className="w-4 h-4" />
+                Filters
+              </button>
+              <button
+                type="submit"
+                disabled={status === "loading" || !q.trim()}
+                className="rounded-xl bg-primary text-primary-foreground px-5 py-3 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2 shrink-0"
+              >
+                {status === "loading" ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                {status === "loading" ? "Searching…" : "Search"}
+              </button>
+            </div>
+
+            {/* Expandable filters */}
+            {showFilters && (
+              <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Work Authorization</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {WORK_AUTH_OPTIONS.map((o) => (
+                      <button
+                        key={o.value}
+                        type="button"
+                        onClick={() => setWorkAuth(o.value)}
+                        className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${workAuth === o.value ? "bg-primary text-primary-foreground" : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border"}`}
                       >
-                        {job.logo}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-semibold text-foreground text-sm leading-tight truncate">{job.role}</div>
-                        <div className="text-muted-foreground text-xs truncate">{job.company}</div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleSave(job.id);
-                      }}
-                      className="shrink-0 text-lg text-muted-foreground hover:text-amber-500 transition-colors"
-                    >
-                      {saved.includes(job.id) ? "★" : "☆"}
-                    </button>
-                  </div>
-
-                  <div className="flex gap-2 flex-wrap mb-3">
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                        job.type.includes("CPT") && job.type.includes("OPT")
-                          ? "bg-primary/15 text-primary border border-primary/30"
-                          : job.type.includes("OPT")
-                            ? "bg-green-500/15 text-green-600 dark:text-green-400 border border-green-500/30"
-                            : "bg-primary/15 text-primary border border-primary/30"
-                      }`}
-                    >
-                      {job.type}
-                    </span>
-                    <span className="rounded-full px-2.5 py-0.5 text-xs text-muted-foreground bg-muted/50 border border-border">
-                      📍 {job.location}
-                    </span>
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs ${
-                        job.remote === "Remote" ? "bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20" : "bg-muted/50 text-muted-foreground border border-border"
-                      }`}
-                    >
-                      {job.remote}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 mb-3 text-sm">
-                    <div>
-                      <div className="text-muted-foreground text-xs">Pay</div>
-                      <div className="font-bold text-green-600 dark:text-green-400">{job.pay}</div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground text-xs">Duration</div>
-                      <div className="font-medium text-foreground">{job.duration}</div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground text-xs">Deadline</div>
-                      <div className="font-medium text-amber-600 dark:text-amber-400">{job.deadline}</div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground text-xs">Spots</div>
-                      <div className={`font-medium ${job.spotsLeft <= 2 ? "text-destructive" : "text-foreground"}`}>
-                        {job.spotsLeft <= 2 ? `⚡ ${job.spotsLeft} left` : job.spotsLeft}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-1.5 flex-wrap mb-3">
-                    {job.tags.map((t) => (
-                      <span key={t} className="rounded-md px-2.5 py-0.5 text-xs text-muted-foreground bg-muted/30 border border-border">
-                        {t}
-                      </span>
+                        {o.label}
+                      </button>
                     ))}
-                  </div>
-
-                  <div className="flex gap-1.5 items-center flex-wrap">
-                    <span className="text-muted-foreground text-xs">Accepts:</span>
-                    {job.visas.map((v) => (
-                      <span key={v} className="rounded-md px-2 py-0.5 text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-                        {v}
-                      </span>
-                    ))}
-                    {job.evVerify && (
-                      <span className="ml-auto rounded-md px-2 py-0.5 text-xs bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20">
-                        ✓ E-Verify
-                      </span>
-                    )}
                   </div>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => setExpanded(expanded === job.id ? null : job.id)}
-                  className="w-full py-2.5 px-4 border-t border-border bg-muted/20 text-muted-foreground text-xs text-left flex justify-between items-center hover:bg-primary/10 transition-colors"
-                >
-                  <span>{expanded === job.id ? "Hide details" : "View details & CPT notes"}</span>
-                  <span className="shrink-0 transition-transform" style={{ transform: expanded === job.id ? "rotate(180deg)" : "none" }}>
-                    ▾
-                  </span>
-                </button>
-
-                {expanded === job.id && (
-                  <div className="p-4 border-t border-border bg-primary/5">
-                    <p className="text-muted-foreground text-sm leading-relaxed mb-3">{job.description}</p>
-                    <div className="rounded-lg border border-primary/20 bg-primary/10 p-3 mb-3">
-                      <div className="text-primary font-semibold text-xs mb-1">📋 CPT Checklist for this role</div>
-                      <div className="text-primary/90 text-xs leading-relaxed">
-                        1. Confirm role is related to your field of study<br />
-                        2. Get a job offer letter from {job.company}<br />
-                        3. Submit CPT request to your DSO with offer letter<br />
-                        4. Receive updated I-20 with CPT authorization<br />
-                        5. Complete I-9 with {job.company} HR on Day 1
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="w-full rounded-lg bg-primary text-primary-foreground py-2.5 px-4 text-sm font-semibold hover:opacity-90 transition-opacity"
-                    >
-                      Apply Now →
-                    </button>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Job Type</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {JOB_TYPE_OPTIONS.map((o) => (
+                      <button
+                        key={o.value}
+                        type="button"
+                        onClick={() => setJobType(o.value)}
+                        className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${jobType === o.value ? "bg-primary text-primary-foreground" : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border"}`}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
                   </div>
-                )}
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Location (optional)</p>
+                  <input
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="City or state — e.g. New York or California"
+                    className="w-full rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
+                  />
+                </div>
               </div>
-            ))}
+            )}
+          </form>
+
+          {/* Preset searches */}
+          <div className="mb-6">
+            <p className="text-xs text-muted-foreground mb-2 font-medium">Quick searches:</p>
+            <div className="flex gap-2 flex-wrap">
+              {PRESET_SEARCHES.map((p) => (
+                <button
+                  key={p.label}
+                  onClick={() => handlePreset(p)}
+                  disabled={status === "loading"}
+                  className="rounded-full px-3.5 py-1.5 text-xs font-medium bg-muted/50 text-muted-foreground hover:bg-primary/10 hover:text-primary border border-border transition-colors disabled:opacity-50"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {filtered.length === 0 && (
-            <div className="text-center py-16 text-muted-foreground">
-              <div className="text-4xl mb-3">🔍</div>
-              <div className="font-medium">No opportunities match your filters.</div>
-              <div className="text-sm mt-1">Try adjusting your search or filters above.</div>
+          {/* ── States ── */}
+
+          {status === "idle" && (
+            <div className="text-center py-20 text-muted-foreground">
+              <div className="text-5xl mb-4">🔍</div>
+              <div className="font-semibold text-lg text-foreground mb-2">Search Real Opportunities</div>
+              <p className="text-sm max-w-md mx-auto">
+                All results are screened for CPT, OPT, STEM OPT, and H-1B visa signals. Jobs that explicitly exclude international students are filtered out automatically.
+              </p>
+              <div className="mt-6 flex items-center justify-center gap-2 text-xs">
+                <Wifi className="w-3.5 h-3.5 text-green-500" />
+                <span>Powered by Adzuna — real listings, updated daily</span>
+              </div>
             </div>
+          )}
+
+          {status === "loading" && (
+            <>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                <RefreshCw className="w-4 h-4 animate-spin text-primary" />
+                <span>Searching for <span className="text-foreground font-medium">"{lastQuery}"</span>…</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => <JobSkeleton key={i} />)}
+              </div>
+            </>
+          )}
+
+          {status === "error" && (
+            <div className="text-center py-16">
+              <WifiOff className="w-10 h-10 text-destructive mx-auto mb-3" />
+              <div className="font-semibold text-foreground mb-1">Search Failed</div>
+              <p className="text-sm text-muted-foreground mb-1">{error}</p>
+              {error.includes("ADZUNA_APP_ID") && (
+                <p className="text-xs text-muted-foreground mb-4">
+                  Add <code className="bg-muted px-1 rounded">ADZUNA_APP_ID</code> and <code className="bg-muted px-1 rounded">ADZUNA_APP_KEY</code> to{" "}
+                  <code className="bg-muted px-1 rounded">univisa-backend/.env</code>.{" "}
+                  <a href="https://developer.adzuna.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                    Sign up free →
+                  </a>
+                </p>
+              )}
+              <button
+                onClick={() => runSearch(lastQuery, location, workAuth, jobType)}
+                className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90 transition-opacity"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
+
+          {status === "done" && (
+            <>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-sm text-muted-foreground">
+                  <span className="text-foreground font-semibold">{jobs.length}</span> international-student-friendly results for{" "}
+                  <span className="text-foreground">"{lastQuery}"</span>
+                </span>
+                <button
+                  onClick={() => runSearch(lastQuery, location, workAuth, jobType)}
+                  className="ml-auto rounded-lg px-3 py-1.5 text-xs border border-border bg-muted/50 text-muted-foreground hover:bg-muted transition-colors flex items-center gap-1"
+                >
+                  <RefreshCw className="w-3 h-3" /> Refresh
+                </button>
+              </div>
+
+              {jobs.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground">
+                  <div className="text-4xl mb-3">📭</div>
+                  <div className="font-medium">No international-student-friendly roles found.</div>
+                  <div className="text-sm mt-1">Try broader keywords or change the work auth filter.</div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {jobs.map((job) => (
+                    <JobCard
+                      key={job.id}
+                      job={job}
+                      saved={savedIds.includes(job.id)}
+                      onToggleSave={() => toggleSave(job.id)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              <p className="text-center text-xs text-muted-foreground mt-8">
+                Sourced via Adzuna · filtered for international student work authorization · always verify visa requirements with the employer and your DSO
+              </p>
+            </>
           )}
         </div>
       </main>
