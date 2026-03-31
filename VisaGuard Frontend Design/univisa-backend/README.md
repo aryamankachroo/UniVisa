@@ -59,7 +59,7 @@ The **AI Advisor** page shows a banner if the backend is unreachable or if the A
 
 ## Demo Student
 
-A pre-loaded profile **Riya Sharma** is available with `student_id: "demo"` so judges can hit the API without the form:
+A pre-loaded profile **Demo Student** is available with `student_id: "demo"` so you can hit the API without the form:
 
 - **GET** `/student/demo/risk` — risk score and flags
 - **GET** `/student/demo/alerts` — alerts list

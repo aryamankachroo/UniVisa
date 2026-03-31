@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Briefcase, Search, FileText } from "lucide-react";
+import { Shield, LayoutDashboard, Bot, User, Bell, Briefcase, Search, FileText } from "lucide-react";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { SidebarUserFooter } from "../components/SidebarUserFooter";
 
 export type PolicyAlertItem = {
   id: string;
@@ -80,7 +81,6 @@ function Sidebar({
   activeNav: string;
   onNav: (path: string, nav: string) => void;
 }) {
-  const navigate = useNavigate();
   const navItems: [string, string, typeof FileText, string][] = [
     ["/dashboard", "dashboard", LayoutDashboard, "Dashboard"],
     ["/ai-advisor", "ai", Bot, "AI Advisor"],
@@ -115,15 +115,7 @@ function Sidebar({
           </button>
         ))}
       </nav>
-      <div className="p-4 border-t border-border">
-        <button
-          onClick={() => navigate("/")}
-          className="w-full flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground"
-        >
-          <LogOut className="w-4 h-4" />
-          <span className="text-sm">Sign Out</span>
-        </button>
-      </div>
+      <SidebarUserFooter />
     </aside>
   );
 }

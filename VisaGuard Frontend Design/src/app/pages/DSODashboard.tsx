@@ -33,7 +33,7 @@ const SCHEDULE_TIME_SLOTS = [
 const STUDENTS_DATA = [
   {
     id: 1,
-    name: "Riya Sharma",
+    name: "Jordan Kim",
     country: "India",
     visa: "F-1",
     programEnd: "May 15, 2026",
@@ -41,7 +41,7 @@ const STUDENTS_DATA = [
     topRiskFlag: "OPT application deadline approaching",
     lastActive: "2 hours ago",
     details: {
-      email: "riya.sharma@gatech.edu",
+      email: "jordan.kim@example.edu",
       major: "Computer Science MS",
       enrollmentStatus: "Full-time",
       workHours: 18,
@@ -177,7 +177,7 @@ export default function DSODashboard() {
           </Link>
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <span className="text-sm text-muted-foreground">Georgia Tech</span>
+            <span className="text-sm text-muted-foreground">Institution</span>
             <Button variant="outline" size="sm" onClick={() => navigate("/")}>
               Sign Out
             </Button>

@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
-import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Send, Briefcase, Search, FileText } from "lucide-react";
+import { Shield, LayoutDashboard, Bot, User, Bell, Send, Briefcase, Search, FileText } from "lucide-react";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { SidebarUserFooter } from "../components/SidebarUserFooter";
 import { ChatBubble } from "../components/ChatBubble";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { getAnswer } from "../UniVisaAdvisor";
+import { chat, getStudentId } from "../api";
 
 interface Message {
   id: number;
@@ -65,17 +67,39 @@ export default function AIAdvisor() {
     setIsTyping(true);
 
     const aiMsgId = nextIdRef.current++;
-    setTimeout(() => {
-      const answer = getAnswer(text);
+    try {
+      const studentId = getStudentId();
+      const result = await chat(studentId, text);
+      const answer = result?.answer ?? "No response.";
+      const isErrorAnswer =
+        /GEMINI_API_KEY|encountered an error|not configured|could not respond|Please try again/i.test(
+          answer
+        );
+      const useBackend = !isErrorAnswer && answer !== "No response.";
+      const finalAnswer = useBackend ? answer : getAnswer(text);
+      const source = useBackend && result?.sources?.length ? result.sources[0] : undefined;
       const aiMessage: Message = {
         id: aiMsgId,
-        message: answer,
+        message: finalAnswer,
         isAI: true,
         timestamp: "Just now",
+        source,
       };
       setMessages((prev) => [...prev, aiMessage]);
+    } catch {
+      const fallbackAnswer = getAnswer(text);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: aiMsgId,
+          message: fallbackAnswer,
+          isAI: true,
+          timestamp: "Just now",
+        },
+      ]);
+    } finally {
       setIsTyping(false);
-    }, 900);
+    }
   };
 
   const handleNavigation = (path: string, nav: string) => {
@@ -170,19 +194,7 @@ export default function AIAdvisor() {
           </button>
         </nav>
 
-        <div className="p-4 border-t border-border">
-          <div className="px-4 py-3">
-            <div className="font-medium">Riya Sharma</div>
-            <div className="text-sm text-muted-foreground">Georgia Tech</div>
-          </div>
-          <button
-            onClick={() => navigate("/")}
-            className="w-full flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground mt-2"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="text-sm">Sign Out</span>
-          </button>
-        </div>
+        <SidebarUserFooter />
       </aside>
 
       {/* Main Content */}

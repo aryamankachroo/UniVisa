@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
+import { Show, SignInButton, UserButton, useClerk, useUser } from "@clerk/react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -11,6 +12,11 @@ import { ThemeToggle } from "../components/ThemeToggle";
 
 const API_BASE = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "http://localhost:8000";
 const UNIVERSITIES_API = `${API_BASE}/universities`;
+const CASES_SUBMIT_API = `${API_BASE}/api/cases/submit`;
+
+function casesMeUrl(clerkUserId: string) {
+  return `${API_BASE}/api/cases/me?clerk_user_id=${encodeURIComponent(clerkUserId)}`;
+}
 
 const COUNTRIES = [
   "Afghanistan", "Albania", "Algeria", "Argentina", "Australia", "Austria", "Bangladesh", "Belgium", "Brazil", "Bulgaria",
@@ -31,47 +37,142 @@ const TOP_UNIVERSITIES = [
   "Carnegie Mellon University",
 ];
 
+type VisaStage = "studying" | "cpt" | "opt" | "stem_opt" | "opt_approved_not_started";
+type EnrollmentStatus = "full_time" | "reduced_course_load" | "not_enrolled";
+type TrainingType = "none" | "cpt" | "opt" | "stem_opt";
+type StemEligible = "yes" | "no" | "not_sure" | "";
+type StemApplicationStatus = "yes" | "no" | "pending" | "";
+type SevisHistory = "yes" | "no" | "not_sure" | "";
+type CptType = "part_time" | "full_time" | "";
+
+interface ImmigrationCaseInput {
+  // These fields mirror backend.backend.risk_engine.types.ImmigrationCaseInput
+  fullName: string;
+  university: string;
+  country: string;
+
+  currentStage: VisaStage;
+
+  programStart: string;
+  programEnd: string;
+
+  enrollmentStatus: EnrollmentStatus;
+
+  workHours?: number;
+  courseChanges?: boolean;
+  usingCpt?: boolean;
+
+  cptHours?: number;
+  cptType?: CptType | "";
+
+  optStart?: string;
+  optEnd?: string;
+
+  unemploymentDaysUsed?: number;
+
+  employedInAuthorizedJob?: boolean;
+  changeEmployer?: boolean;
+
+  stemEligible?: boolean | null;
+  stemApplicationStatus?: "not_applied" | "pending" | "approved" | "denied";
+
+  travelPlans?: boolean;
+  receivedUSCISNotices?: boolean;
+  unauthorizedWork?: boolean;
+  sevisTerminatedBefore?: boolean | null;
+}
+
 interface FormData {
   fullName: string;
   university: string;
   country: string;
-  visaType: "F-1" | "J-1" | "";
+
+  // Visa status (stage only — app is F-1 only)
+  currentStage: VisaStage;
+
+  // Academic program
   programStart: string;
   programEnd: string;
-  enrollmentStatus: string;
-  workHours: number;
-  onOptCpt: boolean;
-  optCptStart: string;
-  optCptEnd: string;
-  travelPlans: boolean;
-  changeEmployer: boolean;
+  enrollmentStatus: EnrollmentStatus;
   courseChanges: boolean;
+
+  // Work compliance (studying / CPT)
+  workHours: number;
+  usingCpt: boolean;
+  cptHours: number;
+  cptType: CptType;
+
+  // OPT details
+  optStart: string;
+  optEnd: string;
+
+  // STEM
+  stemEligible: StemEligible;
+  stemApplicationStatus: StemApplicationStatus;
+
+  // Employment
+  employedInAuthorizedJob: boolean | null;
+  changeEmployer: boolean | null;
+
+  // Risk factors
+  unemploymentDaysUsed: number | "";
+  travelPlans: boolean;
+  receivedUSCISNotices: boolean;
+  unauthorizedWork: boolean;
+  sevisTerminatedBefore: SevisHistory;
 }
 
 export default function Onboarding() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { isLoaded, isSignedIn, user } = useUser();
+  const { openSignIn } = useClerk();
   const [showRoleSelection, setShowRoleSelection] = useState(true);
+  const [studentFlowStarted, setStudentFlowStarted] = useState(false);
   const [step, setStep] = useState(1);
+  const TOTAL_STEPS = 5;
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
     university: "",
     country: "",
-    visaType: "",
+    currentStage: "studying",
     programStart: "",
     programEnd: "",
-    enrollmentStatus: "Full-time",
-    workHours: 18,
-    onOptCpt: false,
-    optCptStart: "",
-    optCptEnd: "",
-    travelPlans: false,
-    changeEmployer: false,
+    enrollmentStatus: "full_time",
     courseChanges: false,
+    workHours: 18,
+    usingCpt: false,
+    cptHours: 20,
+    cptType: "part_time",
+    optStart: "",
+    optEnd: "",
+    stemEligible: "",
+    stemApplicationStatus: "",
+    employedInAuthorizedJob: null,
+    changeEmployer: null,
+    unemploymentDaysUsed: "",
+    travelPlans: false,
+    receivedUSCISNotices: false,
+    unauthorizedWork: false,
+    sevisTerminatedBefore: "",
   });
+
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<{
+    riskScore: number;
+    riskLevel: string;
+    flags: { code: string; description?: string | null }[];
+    tasks: string[];
+    deadlines: { nextDeadline: string | null; daysUntilNextDeadline: number | null };
+  } | null>(null);
 
   const [universities, setUniversities] = useState<string[]>(TOP_UNIVERSITIES);
   const [universitiesLoading, setUniversitiesLoading] = useState(false);
   const [universitiesError, setUniversitiesError] = useState<string | null>(null);
+
+  /** False while checking whether this signed-in user already has a saved case (skip questionnaire). */
+  const [savedCaseLookupDone, setSavedCaseLookupDone] = useState(false);
 
   useEffect(() => {
     fetch(UNIVERSITIES_API)
@@ -89,23 +190,208 @@ export default function Onboarding() {
       });
   }, []);
 
-  const updateField = (field: string, value: any) => {
+  // Returning users: backend already has questionnaire + risk → go straight to dashboard.
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    if (!isSignedIn || !user) {
+      setSavedCaseLookupDone(true);
+      return;
+    }
+
+    let cancelled = false;
+    setSavedCaseLookupDone(false);
+
+    fetch(casesMeUrl(user.id))
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { risk?: unknown } | null) => {
+        if (cancelled || !data?.risk) return;
+        navigate("/dashboard", { replace: true });
+      })
+      .catch(() => {
+        /* stay on onboarding if API unreachable */
+      })
+      .finally(() => {
+        if (!cancelled) setSavedCaseLookupDone(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, isSignedIn, user?.id, navigate]);
+
+  // Keep role selection as an explicit choice (no auto-redirect).
+  // However, if the user clicked "I'm a Student" and then completed sign-in,
+  // automatically continue into the questionnaire.
+  useEffect(() => {
+    if (studentFlowStarted && isLoaded && isSignedIn) {
+      goToStudentStep(1);
+      setStudentFlowStarted(false);
+    }
+  }, [studentFlowStarted, isLoaded, isSignedIn]);
+
+  // Sync splash/questionnaire + step with URL so browser back/forward works.
+  useEffect(() => {
+    const sp = new URLSearchParams(location.search);
+    const view = sp.get("view"); // "student" | null
+    const stepParam = sp.get("step");
+
+    if (view === "student") {
+      setShowRoleSelection(false);
+      const n = Number(stepParam);
+      if (Number.isFinite(n) && n >= 1 && n <= TOTAL_STEPS) {
+        setStep(n);
+      } else {
+        setStep(1);
+      }
+    } else {
+      setShowRoleSelection(true);
+      setStep(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
+
+  const goToStudentStep = (nextStep: number, replace = false) => {
+    const s = Math.max(1, Math.min(TOTAL_STEPS, nextStep));
+    navigate({ pathname: "/", search: `?view=student&step=${s}` }, { replace });
+  };
+
+  const goToRoleSelection = (replace = false) => {
+    navigate({ pathname: "/", search: "" }, { replace });
+  };
+
+  const updateField = (field: keyof FormData, value: FormData[typeof field]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = () => {
-    // Store form data in localStorage for demo purposes
-    localStorage.setItem("uniVisaUser", JSON.stringify(formData));
-    navigate("/dashboard");
+  const buildImmigrationCaseInput = (): ImmigrationCaseInput => {
+    // Map form data into the new deterministic engine's input shape
+    const unemploymentDays =
+      typeof formData.unemploymentDaysUsed === "number"
+        ? formData.unemploymentDaysUsed
+        : formData.unemploymentDaysUsed === ""
+        ? 0
+        : Number(formData.unemploymentDaysUsed) || 0;
+
+    const stemEligibleBool =
+      formData.stemEligible === "yes"
+        ? true
+        : formData.stemEligible === "no"
+        ? false
+        : null;
+
+    let stemStatus: ImmigrationCaseInput["stemApplicationStatus"] = undefined;
+    if (formData.stemApplicationStatus === "yes") stemStatus = "approved";
+    else if (formData.stemApplicationStatus === "pending") stemStatus = "pending";
+    else if (formData.stemApplicationStatus === "no") stemStatus = "denied";
+
+    const sevisTerminatedBool =
+      formData.sevisTerminatedBefore === "yes"
+        ? true
+        : formData.sevisTerminatedBefore === "no"
+        ? false
+        : null;
+
+    return {
+      fullName: formData.fullName,
+      university: formData.university,
+      country: formData.country,
+
+      currentStage: formData.currentStage,
+
+      programStart: formData.programStart,
+      programEnd: formData.programEnd,
+
+      enrollmentStatus: formData.enrollmentStatus,
+
+      workHours: formData.workHours,
+      courseChanges: formData.courseChanges,
+      usingCpt: formData.currentStage === "cpt" || formData.usingCpt,
+
+      cptHours: formData.cptHours,
+      cptType: formData.cptType || undefined,
+
+      optStart: formData.optStart || undefined,
+      optEnd: formData.optEnd || undefined,
+
+      unemploymentDaysUsed: unemploymentDays,
+
+      employedInAuthorizedJob: formData.employedInAuthorizedJob ?? undefined,
+      changeEmployer: formData.changeEmployer ?? undefined,
+
+      stemEligible: stemEligibleBool,
+      stemApplicationStatus: stemStatus,
+
+      travelPlans: formData.travelPlans,
+      receivedUSCISNotices: formData.receivedUSCISNotices,
+      unauthorizedWork: formData.unauthorizedWork,
+      sevisTerminatedBefore: sevisTerminatedBool,
+    };
   };
 
-  const progressPercent = (step / 3) * 100;
+  const handleSubmit = async () => {
+    if (!user) {
+      setSubmitError("Please sign in first to save your analysis.");
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    const immigration_case_input = buildImmigrationCaseInput();
+
+    try {
+      const response = await fetch(CASES_SUBMIT_API, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          clerkUserId: user.id,
+          immigration_case_input,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      setAnalysisResult(data);
+      localStorage.setItem("immigration_case_input", JSON.stringify(immigration_case_input));
+      localStorage.setItem("immigration_case_analysis", JSON.stringify(data));
+      navigate("/dashboard", { replace: true });
+    } catch (error) {
+      console.error("Failed to analyze compliance", error);
+      setSubmitError("We could not analyze your compliance right now. Please try again in a few minutes.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const progressPercent = (step / TOTAL_STEPS) * 100;
+
+  if (!isLoaded || (isSignedIn && !savedCaseLookupDone)) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      </div>
+    );
+  }
 
   if (showRoleSelection) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
-        <div className="fixed top-4 right-4 z-10">
+        <div className="fixed top-4 right-4 z-10 flex items-center gap-3">
           <ThemeToggle />
+          <Show when="signed-out">
+            <div className="flex items-center gap-2">
+              <SignInButton>Log in</SignInButton>
+            </div>
+          </Show>
+          <Show when="signed-in">
+            <UserButton />
+          </Show>
         </div>
         <div className="w-full max-w-4xl">
           {/* Logo and Title */}
@@ -128,7 +414,17 @@ export default function Onboarding() {
             className="grid grid-cols-1 md:grid-cols-2 gap-6"
           >
             <button
-              onClick={() => setShowRoleSelection(false)}
+              onClick={() => {
+                if (isSignedIn) {
+                  goToStudentStep(1);
+                  return;
+                }
+                setStudentFlowStarted(true);
+                openSignIn({}).catch(() => {
+                  // If modal fails to open for any reason, keep the splash visible.
+                  setStudentFlowStarted(false);
+                });
+              }}
               className="group bg-card border-2 border-border hover:border-primary rounded-lg p-8 transition-all hover:scale-[1.02]"
             >
               <div className="flex flex-col items-center text-center">
@@ -193,7 +489,7 @@ export default function Onboarding() {
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex justify-between mb-2 text-sm">
-            <span className="text-muted-foreground">Step {step} of 3</span>
+            <span className="text-muted-foreground">Step {step} of {TOTAL_STEPS}</span>
             <span className="text-primary font-medium">{Math.round(progressPercent)}%</span>
           </div>
           <div className="h-2 bg-secondary rounded-full overflow-hidden">
@@ -208,6 +504,77 @@ export default function Onboarding() {
 
         {/* Form Card */}
         <div className="bg-card border border-border rounded-lg p-8">
+              {analysisResult ? (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-semibold mb-2">Your compliance analysis</h2>
+              <p className="text-muted-foreground">
+                Based on your answers, here is a snapshot of your current F-1/J-1 compliance position.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {typeof analysisResult.riskScore === "number" && (
+                  <div className="p-4 rounded-lg bg-muted/60">
+                    <div className="text-xs font-medium text-muted-foreground uppercase mb-1">Risk score</div>
+                    <div className="text-2xl font-semibold">{analysisResult.riskScore}</div>
+                  </div>
+                )}
+                {analysisResult.riskLevel && (
+                  <div className="p-4 rounded-lg bg-muted/60">
+                    <div className="text-xs font-medium text-muted-foreground uppercase mb-1">Current stage</div>
+                    <div className="text-base font-medium">{analysisResult.riskLevel}</div>
+                  </div>
+                )}
+                {Array.isArray(analysisResult.flags) && analysisResult.flags.length > 0 && (
+                  <div className="p-4 rounded-lg bg-muted/60">
+                    <div className="text-xs font-medium text-muted-foreground uppercase mb-1">Flags</div>
+                    <div className="text-base font-medium">
+                      {analysisResult.flags.map((f) => f.code).join(", ")}
+                    </div>
+                  </div>
+                )}
+                {analysisResult.deadlines && (
+                  <div className="p-4 rounded-lg bg-muted/60">
+                    <div className="text-xs font-medium text-muted-foreground uppercase mb-1">Next deadline</div>
+                    <div className="text-base font-medium">
+                      {analysisResult.deadlines.nextDeadline || "No upcoming deadline detected"}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {Array.isArray(analysisResult.urgent_tasks) && analysisResult.urgent_tasks.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">Urgent tasks</h3>
+                  <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                    {analysisResult.urgent_tasks.map((task, idx) => (
+                      <li key={idx}>{task}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {analysisResult.compliance_explanation && (
+                <div className="p-4 rounded-lg bg-muted/60 text-sm text-muted-foreground whitespace-pre-line">
+                  {analysisResult.compliance_explanation}
+                </div>
+              )}
+
+              <div className="flex justify-between pt-4 border-t border-border mt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setAnalysisResult(null);
+                    setStep(1);
+                  }}
+                >
+                  Edit answers
+                </Button>
+                <Button onClick={() => navigate("/dashboard")} className="bg-primary">
+                  Go to dashboard
+                </Button>
+              </div>
+            </div>
+          ) : (
+          <>
           <AnimatePresence mode="wait">
             {step === 1 && (
               <motion.div
@@ -217,7 +584,7 @@ export default function Onboarding() {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
-                <h2 className="text-2xl font-semibold mb-6">Who are you?</h2>
+                <h2 className="text-2xl font-semibold mb-6">Basic profile</h2>
 
                 <div>
                   <Label htmlFor="fullName">Full Name</Label>
@@ -269,40 +636,6 @@ export default function Onboarding() {
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div>
-                  <Label className="mb-3 block">Visa Type</Label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      type="button"
-                      onClick={() => updateField("visaType", "F-1")}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.visaType === "F-1"
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-transparent hover:border-primary/50"
-                      }`}
-                    >
-                      <div className="font-semibold mb-1">F-1 Visa</div>
-                      <div className="text-sm text-muted-foreground">
-                        Academic Student
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateField("visaType", "J-1")}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.visaType === "J-1"
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-transparent hover:border-primary/50"
-                      }`}
-                    >
-                      <div className="font-semibold mb-1">J-1 Visa</div>
-                      <div className="text-sm text-muted-foreground">
-                        Exchange Visitor
-                      </div>
-                    </button>
-                  </div>
-                </div>
               </motion.div>
             )}
 
@@ -314,125 +647,28 @@ export default function Onboarding() {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
-                <h2 className="text-2xl font-semibold mb-6">Your visa situation</h2>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="programStart">Program Start Date</Label>
-                    <Input
-                      id="programStart"
-                      type="date"
-                      value={formData.programStart}
-                      onChange={(e) => updateField("programStart", e.target.value)}
-                      className="mt-1.5"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="programEnd">Program End Date</Label>
-                    <Input
-                      id="programEnd"
-                      type="date"
-                      value={formData.programEnd}
-                      onChange={(e) => updateField("programEnd", e.target.value)}
-                      className="mt-1.5"
-                    />
-                  </div>
-                </div>
-
+                <h2 className="text-2xl font-semibold mb-6">Your current F-1 stage</h2>
+                <p className="text-muted-foreground text-sm mb-4">
+                  This determines which questions we show next.
+                </p>
                 <div>
-                  <Label htmlFor="enrollmentStatus">Current Enrollment Status</Label>
+                  <Label htmlFor="currentStage">Current stage</Label>
                   <Select
-                    value={formData.enrollmentStatus}
-                    onValueChange={(value) => updateField("enrollmentStatus", value)}
+                    value={formData.currentStage}
+                    onValueChange={(value) => updateField("currentStage", value as VisaStage)}
                   >
                     <SelectTrigger className="mt-1.5">
-                      <SelectValue />
+                      <SelectValue placeholder="Select your stage" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Full-time">Full-time</SelectItem>
-                      <SelectItem value="Part-time">Part-time</SelectItem>
-                      <SelectItem value="On break">On break</SelectItem>
+                      <SelectItem value="studying">Studying (in program)</SelectItem>
+                      <SelectItem value="cpt">On CPT (Curricular Practical Training)</SelectItem>
+                      <SelectItem value="opt">On standard OPT</SelectItem>
+                      <SelectItem value="stem_opt">On STEM OPT</SelectItem>
+                      <SelectItem value="opt_approved_not_started">OPT approved, not started</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div>
-                  <Label htmlFor="workHours">
-                    Weekly On-Campus Work Hours: {formData.workHours}
-                  </Label>
-                  <Slider
-                    id="workHours"
-                    min={0}
-                    max={40}
-                    step={1}
-                    value={[formData.workHours]}
-                    onValueChange={(value) => updateField("workHours", value[0])}
-                    className="mt-3"
-                  />
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>0 hours</span>
-                    <span>40 hours</span>
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="mb-3 block">
-                    Are you currently on OPT or CPT?
-                  </Label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      type="button"
-                      onClick={() => updateField("onOptCpt", true)}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.onOptCpt
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      Yes
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateField("onOptCpt", false)}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        !formData.onOptCpt
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      No
-                    </button>
-                  </div>
-                </div>
-
-                {formData.onOptCpt && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    className="grid grid-cols-2 gap-4"
-                  >
-                    <div>
-                      <Label htmlFor="optCptStart">OPT/CPT Start Date</Label>
-                      <Input
-                        id="optCptStart"
-                        type="date"
-                        value={formData.optCptStart}
-                        onChange={(e) => updateField("optCptStart", e.target.value)}
-                        className="mt-1.5"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="optCptEnd">OPT/CPT End Date</Label>
-                      <Input
-                        id="optCptEnd"
-                        type="date"
-                        value={formData.optCptEnd}
-                        onChange={(e) => updateField("optCptEnd", e.target.value)}
-                        className="mt-1.5"
-                      />
-                    </div>
-                  </motion.div>
-                )}
               </motion.div>
             )}
 
@@ -444,11 +680,227 @@ export default function Onboarding() {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
-                <h2 className="text-2xl font-semibold mb-6">Upcoming plans</h2>
+                <h2 className="text-2xl font-semibold mb-6">Program dates</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="programStart">Program start date (I-20)</Label>
+                    <Input
+                      id="programStart"
+                      type="date"
+                      value={formData.programStart}
+                      onChange={(e) => updateField("programStart", e.target.value)}
+                      className="mt-1.5"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="programEnd">Program end date (I-20)</Label>
+                    <Input
+                      id="programEnd"
+                      type="date"
+                      value={formData.programEnd}
+                      onChange={(e) => updateField("programEnd", e.target.value)}
+                      className="mt-1.5"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {step === 4 && (
+              <motion.div
+                key="step4"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                <h2 className="text-2xl font-semibold mb-6">Details for your stage</h2>
+
+                {formData.currentStage === "studying" && (
+                  <>
+                    <div>
+                      <Label htmlFor="enrollmentStatus">Enrollment status</Label>
+                      <Select
+                        value={formData.enrollmentStatus}
+                        onValueChange={(value) => updateField("enrollmentStatus", value as EnrollmentStatus)}
+                      >
+                        <SelectTrigger className="mt-1.5">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="full_time">Full-time</SelectItem>
+                          <SelectItem value="reduced_course_load">Reduced course load (authorized)</SelectItem>
+                          <SelectItem value="not_enrolled">Not enrolled this term</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="workHours">Weekly on-campus work hours: {formData.workHours}</Label>
+                      <Slider
+                        id="workHours"
+                        min={0}
+                        max={40}
+                        step={1}
+                        value={[formData.workHours]}
+                        onValueChange={(value) => updateField("workHours", value[0])}
+                        className="mt-3"
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                        <span>0</span>
+                        <span>40</span>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="mb-3 block">Planning to drop or add courses this semester?</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button type="button" onClick={() => updateField("courseChanges", true)}
+                          className={`p-4 rounded-lg border-2 transition-all ${formData.courseChanges ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>Yes</button>
+                        <button type="button" onClick={() => updateField("courseChanges", false)}
+                          className={`p-4 rounded-lg border-2 transition-all ${!formData.courseChanges ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>No</button>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="mb-3 block">Using CPT for off-campus work?</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button type="button" onClick={() => updateField("usingCpt", true)}
+                          className={`p-4 rounded-lg border-2 transition-all ${formData.usingCpt ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>Yes</button>
+                        <button type="button" onClick={() => updateField("usingCpt", false)}
+                          className={`p-4 rounded-lg border-2 transition-all ${!formData.usingCpt ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>No</button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {formData.currentStage === "cpt" && (
+                  <>
+                    <div>
+                      <Label htmlFor="enrollmentStatusCpt">Enrollment status</Label>
+                      <Select value={formData.enrollmentStatus} onValueChange={(value) => updateField("enrollmentStatus", value as EnrollmentStatus)}>
+                        <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="full_time">Full-time</SelectItem>
+                          <SelectItem value="reduced_course_load">Reduced course load</SelectItem>
+                          <SelectItem value="not_enrolled">Not enrolled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>CPT hours per week: {formData.cptHours}</Label>
+                      <Slider id="cptHours" min={0} max={40} step={1} value={[formData.cptHours]} onValueChange={(v) => updateField("cptHours", v[0])} className="mt-3" />
+                    </div>
+                    <div>
+                      <Label htmlFor="cptType">CPT type</Label>
+                      <Select value={formData.cptType} onValueChange={(value) => updateField("cptType", value as CptType)}>
+                        <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="part_time">Part-time (≤20 hrs/week)</SelectItem>
+                          <SelectItem value="full_time">Full-time</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+
+                {formData.currentStage === "opt" && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="optStart">OPT start date</Label>
+                        <Input id="optStart" type="date" value={formData.optStart} onChange={(e) => updateField("optStart", e.target.value)} className="mt-1.5" />
+                      </div>
+                      <div>
+                        <Label htmlFor="optEnd">OPT end date</Label>
+                        <Input id="optEnd" type="date" value={formData.optEnd} onChange={(e) => updateField("optEnd", e.target.value)} className="mt-1.5" />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="unemploymentDays">Unemployment days used</Label>
+                      <Input id="unemploymentDays" type="number" min={0} value={formData.unemploymentDaysUsed}
+                        onChange={(e) => { const v = e.target.value; updateField("unemploymentDaysUsed", v === "" ? "" : Math.max(0, Number(v) || 0)); }} className="mt-1.5" />
+                    </div>
+                    <div>
+                      <Label className="mb-3 block">Employed in a job authorized for OPT?</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button type="button" onClick={() => updateField("employedInAuthorizedJob", true)}
+                          className={`p-4 rounded-lg border-2 transition-all ${formData.employedInAuthorizedJob === true ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>Yes</button>
+                        <button type="button" onClick={() => updateField("employedInAuthorizedJob", false)}
+                          className={`p-4 rounded-lg border-2 transition-all ${formData.employedInAuthorizedJob === false ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>No</button>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="mb-3 block">Planning to change employers?</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button type="button" onClick={() => updateField("changeEmployer", true)}
+                          className={`p-4 rounded-lg border-2 transition-all ${formData.changeEmployer === true ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>Yes</button>
+                        <button type="button" onClick={() => updateField("changeEmployer", false)}
+                          className={`p-4 rounded-lg border-2 transition-all ${formData.changeEmployer === false ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>No</button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {formData.currentStage === "stem_opt" && (
+                  <>
+                    <div>
+                      <Label className="mb-3 block">Degree STEM-eligible for STEM OPT?</Label>
+                      <div className="grid grid-cols-3 gap-4">
+                        <button type="button" onClick={() => updateField("stemEligible", "yes")} className={`p-3 rounded-lg border-2 text-sm ${formData.stemEligible === "yes" ? "border-primary bg-primary/10" : "border-border"}`}>Yes</button>
+                        <button type="button" onClick={() => updateField("stemEligible", "no")} className={`p-3 rounded-lg border-2 text-sm ${formData.stemEligible === "no" ? "border-primary bg-primary/10" : "border-border"}`}>No</button>
+                        <button type="button" onClick={() => updateField("stemEligible", "not_sure")} className={`p-3 rounded-lg border-2 text-sm ${formData.stemEligible === "not_sure" ? "border-primary bg-primary/10" : "border-border"}`}>Not sure</button>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="mb-3 block">STEM OPT application status</Label>
+                      <div className="grid grid-cols-3 gap-4">
+                        <button type="button" onClick={() => updateField("stemApplicationStatus", "yes")} className={`p-3 rounded-lg border-2 text-sm ${formData.stemApplicationStatus === "yes" ? "border-primary bg-primary/10" : "border-border"}`}>Approved</button>
+                        <button type="button" onClick={() => updateField("stemApplicationStatus", "pending")} className={`p-3 rounded-lg border-2 text-sm ${formData.stemApplicationStatus === "pending" ? "border-primary bg-primary/10" : "border-border"}`}>Pending</button>
+                        <button type="button" onClick={() => updateField("stemApplicationStatus", "no")} className={`p-3 rounded-lg border-2 text-sm ${formData.stemApplicationStatus === "no" ? "border-primary bg-primary/10" : "border-border"}`}>Not applied</button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><Label>OPT/STEM OPT start date</Label><Input type="date" value={formData.optStart} onChange={(e) => updateField("optStart", e.target.value)} className="mt-1.5" /></div>
+                      <div><Label>OPT/STEM OPT end date</Label><Input type="date" value={formData.optEnd} onChange={(e) => updateField("optEnd", e.target.value)} className="mt-1.5" /></div>
+                    </div>
+                    <div>
+                      <Label>Unemployment days used (OPT + STEM OPT)</Label>
+                      <Input type="number" min={0} value={formData.unemploymentDaysUsed}
+                        onChange={(e) => { const v = e.target.value; updateField("unemploymentDaysUsed", v === "" ? "" : Math.max(0, Number(v) || 0)); }} className="mt-1.5" />
+                    </div>
+                    <div>
+                      <Label className="mb-3 block">Planning to change employers?</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button type="button" onClick={() => updateField("changeEmployer", true)} className={`p-4 rounded-lg border-2 ${formData.changeEmployer === true ? "border-primary bg-primary/10" : "border-border"}`}>Yes</button>
+                        <button type="button" onClick={() => updateField("changeEmployer", false)} className={`p-4 rounded-lg border-2 ${formData.changeEmployer === false ? "border-primary bg-primary/10" : "border-border"}`}>No</button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {formData.currentStage === "opt_approved_not_started" && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><Label>OPT start date</Label><Input type="date" value={formData.optStart} onChange={(e) => updateField("optStart", e.target.value)} className="mt-1.5" /></div>
+                      <div><Label>OPT end date</Label><Input type="date" value={formData.optEnd} onChange={(e) => updateField("optEnd", e.target.value)} className="mt-1.5" /></div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">We only need your OPT dates until you start.</p>
+                  </>
+                )}
+              </motion.div>
+            )}
+
+            {step === 5 && (
+              <motion.div
+                key="step5"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                <h2 className="text-2xl font-semibold mb-6">Risk factors</h2>
 
                 <div>
                   <Label className="mb-3 block">
-                    Planning to travel outside US in next 90 days?
+                    Planning to travel outside the US in the next 90 days?
                   </Label>
                   <div className="grid grid-cols-2 gap-4">
                     <button
@@ -477,15 +929,13 @@ export default function Onboarding() {
                 </div>
 
                 <div>
-                  <Label className="mb-3 block">
-                    Planning to change employers?
-                  </Label>
+                  <Label className="mb-3 block">Have you received any USCIS notices or RFEs?</Label>
                   <div className="grid grid-cols-2 gap-4">
                     <button
                       type="button"
-                      onClick={() => updateField("changeEmployer", true)}
+                      onClick={() => updateField("receivedUSCISNotices", true)}
                       className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.changeEmployer
+                        formData.receivedUSCISNotices
                           ? "border-primary bg-primary/10"
                           : "border-border hover:border-primary/50"
                       }`}
@@ -494,9 +944,9 @@ export default function Onboarding() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => updateField("changeEmployer", false)}
+                      onClick={() => updateField("receivedUSCISNotices", false)}
                       className={`p-4 rounded-lg border-2 transition-all ${
-                        !formData.changeEmployer
+                        !formData.receivedUSCISNotices
                           ? "border-primary bg-primary/10"
                           : "border-border hover:border-primary/50"
                       }`}
@@ -507,15 +957,13 @@ export default function Onboarding() {
                 </div>
 
                 <div>
-                  <Label className="mb-3 block">
-                    Planning to drop or add courses this semester?
-                  </Label>
+                  <Label className="mb-3 block">Have you ever worked without proper authorization?</Label>
                   <div className="grid grid-cols-2 gap-4">
                     <button
                       type="button"
-                      onClick={() => updateField("courseChanges", true)}
+                      onClick={() => updateField("unauthorizedWork", true)}
                       className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.courseChanges
+                        formData.unauthorizedWork
                           ? "border-primary bg-primary/10"
                           : "border-border hover:border-primary/50"
                       }`}
@@ -524,9 +972,9 @@ export default function Onboarding() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => updateField("courseChanges", false)}
+                      onClick={() => updateField("unauthorizedWork", false)}
                       className={`p-4 rounded-lg border-2 transition-all ${
-                        !formData.courseChanges
+                        !formData.unauthorizedWork
                           ? "border-primary bg-primary/10"
                           : "border-border hover:border-primary/50"
                       }`}
@@ -535,29 +983,83 @@ export default function Onboarding() {
                     </button>
                   </div>
                 </div>
+
+                <div>
+                  <Label className="mb-3 block">Has your SEVIS record ever been terminated?</Label>
+                  <div className="grid grid-cols-3 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => updateField("sevisTerminatedBefore", "yes")}
+                      className={`p-3 rounded-lg border-2 text-sm transition-all ${
+                        formData.sevisTerminatedBefore === "yes"
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      Yes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateField("sevisTerminatedBefore", "no")}
+                      className={`p-3 rounded-lg border-2 text-sm transition-all ${
+                        formData.sevisTerminatedBefore === "no"
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      No
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateField("sevisTerminatedBefore", "not_sure")}
+                      className={`p-3 rounded-lg border-2 text-sm transition-all ${
+                        formData.sevisTerminatedBefore === "not_sure"
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      Not sure
+                    </button>
+                  </div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
 
+          {submitError && !analysisResult && (
+            <div className="mt-4 text-sm text-destructive">
+              {submitError}
+            </div>
+          )}
+
           {/* Navigation Buttons */}
+          {!analysisResult && (
           <div className="flex justify-between mt-8 pt-6 border-t border-border">
             <Button
               variant="outline"
-              onClick={() => setStep((s) => Math.max(1, s - 1))}
-              disabled={step === 1}
+              onClick={() => {
+                if (step <= 1) {
+                  goToRoleSelection();
+                } else {
+                  goToStudentStep(step - 1);
+                }
+              }}
             >
               Back
             </Button>
-            {step < 3 ? (
-              <Button onClick={() => setStep((s) => s + 1)} className="bg-primary">
+            {step < TOTAL_STEPS ? (
+              <Button onClick={() => goToStudentStep(step + 1)} className="bg-primary">
                 Continue
               </Button>
             ) : (
-              <Button onClick={handleSubmit} className="bg-primary min-w-[200px]">
-                Analyze My Risk
+              <Button onClick={handleSubmit} className="bg-primary min-w-[200px]" disabled={submitting}>
+                {submitting ? "Analyzing..." : "Analyze My Risk"}
               </Button>
             )}
           </div>
+          )}
+          </>
+          )}
         </div>
       </div>
     </div>

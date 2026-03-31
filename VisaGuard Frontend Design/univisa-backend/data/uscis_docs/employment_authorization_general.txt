@@ -1,0 +1,25 @@
+Employment Authorization and EAD Framework
+
+Application for Employment Authorization
+
+Form I-765, Application for Employment Authorization, is used to request employment authorization.
+
+i-765
+
+Employment Authorization Document (EAD)
+
+The EAD (Form I-766) is issued as evidence that the holder is authorized to work in the United States.
+
+i-765instr
+
+Initial EAD – Issued for the first time under a specific eligibility category.
+Renewal EAD – Issued after expiration of a previous EAD under the same category.
+Replacement EAD – Issued when a previously issued EAD was lost, stolen, damaged, or contains errors.
+
+i-765instr
+
+Form I-765WS
+
+Form I-765WS (Worksheet) is required for applicants under certain deferred action categories to demonstrate economic necessity.
+
+i-765ws

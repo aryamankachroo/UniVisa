@@ -1,12 +1,17 @@
 import { useState, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router";
+<<<<<<< HEAD
 import {
   Shield, LayoutDashboard, Bot, User, Bell, LogOut,
   Briefcase, Search, FileText, RefreshCw, ExternalLink,
   BookmarkPlus, BookmarkCheck, ChevronDown, ChevronUp,
   AlertTriangle, Wifi, WifiOff, SlidersHorizontal,
 } from "lucide-react";
+=======
+import { Shield, LayoutDashboard, Bot, User, Bell, Briefcase, Search, FileText } from "lucide-react";
+>>>>>>> shrish-updates
 import { ThemeToggle } from "../components/ThemeToggle";
+import { SidebarUserFooter } from "../components/SidebarUserFooter";
 
 // ─── API base (same pattern as your existing api.ts) ──────────────────────────
 const API_BASE =
@@ -44,7 +49,6 @@ type JobTypeParam  = "all" | "internship" | "fulltime" | "coop";
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 function Sidebar({ activeNav, onNav }: { activeNav: string; onNav: (path: string, nav: string) => void }) {
-  const navigate = useNavigate();
   return (
     <aside className="w-64 bg-card border-r border-border flex flex-col">
       <div className="p-6 border-b border-border flex items-center justify-between gap-2">
@@ -76,12 +80,7 @@ function Sidebar({ activeNav, onNav }: { activeNav: string; onNav: (path: string
           </button>
         ))}
       </nav>
-      <div className="p-4 border-t border-border">
-        <button onClick={() => navigate("/")} className="w-full flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground">
-          <LogOut className="w-4 h-4" />
-          <span className="text-sm">Sign Out</span>
-        </button>
-      </div>
+      <SidebarUserFooter />
     </aside>
   );
 }

@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
-import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Briefcase, Search, FileText } from "lucide-react";
+import { Shield, LayoutDashboard, Bot, User, Bell, Briefcase, Search, FileText } from "lucide-react";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { SidebarUserFooter } from "../components/SidebarUserFooter";
 import { AlertCard } from "../components/AlertCard";
 import { motion } from "motion/react";
 import { getStudentId, getAlerts, type Alert } from "../api";
@@ -156,19 +157,7 @@ export default function Alerts() {
           </button>
         </nav>
 
-        <div className="p-4 border-t border-border">
-          <div className="px-4 py-3">
-            <div className="font-medium">Riya Sharma</div>
-            <div className="text-sm text-muted-foreground">Georgia Tech</div>
-          </div>
-          <button
-            onClick={() => navigate("/")}
-            className="w-full flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground mt-2"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="text-sm">Sign Out</span>
-          </button>
-        </div>
+        <SidebarUserFooter />
       </aside>
 
       {/* Main Content */}

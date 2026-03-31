@@ -1,21 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Shield, LayoutDashboard, Bot, User, Bell, LogOut, Briefcase, Search, FileText } from "lucide-react";
+import { useUser } from "@clerk/react";
+import { Shield, LayoutDashboard, Bot, User, Bell, Briefcase, Search, FileText } from "lucide-react";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { SidebarUserFooter } from "../components/SidebarUserFooter";
 import { RiskScoreGauge } from "../components/RiskScoreGauge";
 import { RiskBadge } from "../components/RiskBadge";
 import { DeadlineCountdown } from "../components/DeadlineCountdown";
 import { Button } from "../components/ui/button";
 import { motion } from "motion/react";
 
-// Demo data for Riya Sharma
+// Demo data fallback for widgets when no saved case is loaded (no fake user identity)
 const DEMO_DATA = {
-  student: {
-    name: "Riya Sharma",
-    university: "Georgia Tech",
-    riskScore: 74,
-    lastUpdated: new Date().toLocaleString(),
-  },
   activeRisks: [
     {
       id: 1,
@@ -46,9 +42,108 @@ const DEMO_DATA = {
   },
 };
 
+const HIGH_SEVERITY_FLAGS = new Set([
+  "unauthorized_work",
+  "sevis_termination_history",
+  "opt_unemployment_exceeded",
+  "enrollment_violation",
+  "cpt_enrollment_violation",
+  "invalid_stem_extension",
+  "cpt_hours_violation",
+]);
+
+const MEDIUM_SEVERITY_FLAGS = new Set([
+  "opt_unemployment_warning",
+  "uscis_notice_received",
+  "on_campus_work_violation",
+  "reduced_course_load_review",
+  "stem_eligibility_unknown",
+  "travel_risk",
+]);
+
+function severityForFlagCode(code: string): "high" | "medium" | "low" {
+  if (HIGH_SEVERITY_FLAGS.has(code)) return "high";
+  if (MEDIUM_SEVERITY_FLAGS.has(code)) return "medium";
+  return "low";
+}
+
+function titleForFlag(flag: { code: string; description?: string | null }) {
+  const d = flag.description?.trim();
+  if (d) return d;
+  return flag.code.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user, isLoaded } = useUser();
   const [activeNav, setActiveNav] = useState("dashboard");
+  const [dashboardData, setDashboardData] = useState<{
+    profile: any;
+    risk: any;
+    questionnaire: any;
+  } | null>(null);
+
+  // Backend API base (same convention as Onboarding)
+  const API_BASE =
+    (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "http://localhost:8000";
+
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+
+    fetch(`${API_BASE}/api/cases/me?clerk_user_id=${encodeURIComponent(user.id)}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load dashboard data");
+        return res.json();
+      })
+      .then((data) => {
+        setDashboardData(data);
+      })
+      .catch((err) => {
+        console.error("Failed to load dashboard data", err);
+      });
+  }, [API_BASE, isLoaded, user]);
+
+  const hasSavedRisk = dashboardData?.risk != null && typeof dashboardData.risk.riskScore === "number";
+  const riskScore = hasSavedRisk ? dashboardData!.risk.riskScore : 0;
+  const lastUpdated = hasSavedRisk ? new Date().toLocaleString() : "—";
+
+  const savedRisk = dashboardData?.risk;
+  const apiFlags = savedRisk?.flags;
+  const useBackendRisks = savedRisk != null && Array.isArray(apiFlags);
+  const activeRisksFromApi = useBackendRisks
+    ? apiFlags.map((f: { code: string; description?: string | null }, i: number) => ({
+        id: i,
+        title: titleForFlag(f),
+        description:
+          f.description?.trim() ||
+          "This item was raised by the compliance check from your saved questionnaire.",
+        severity: severityForFlagCode(f.code) as "high" | "medium" | "low",
+      }))
+    : null;
+
+  const activeRisks = activeRisksFromApi ?? DEMO_DATA.activeRisks;
+  const showBackendRiskEmpty = Boolean(useBackendRisks && activeRisksFromApi && activeRisksFromApi.length === 0);
+
+  const deadlinesPayload = savedRisk?.deadlines;
+  const nextDeadlineRaw = deadlinesPayload?.nextDeadline;
+  const daysUntil = deadlinesPayload?.daysUntilNextDeadline;
+  const hasBackendDeadline =
+    savedRisk != null && nextDeadlineRaw != null && daysUntil != null;
+
+  const upcomingDeadlines =
+    savedRisk == null
+      ? DEMO_DATA.upcomingDeadlines
+      : hasBackendDeadline
+        ? [
+            {
+              title: "Next compliance deadline",
+              date: new Date(String(nextDeadlineRaw)),
+              days: typeof daysUntil === "number" ? daysUntil : Number(daysUntil),
+            },
+          ]
+        : [];
+
+  const showBackendDeadlineEmpty = savedRisk != null && !hasBackendDeadline;
 
   const handleNavigation = (path: string, nav: string) => {
     setActiveNav(nav);
@@ -142,21 +237,7 @@ export default function Dashboard() {
           </button>
         </nav>
 
-        <div className="p-4 border-t border-border">
-          <div className="px-4 py-3">
-            <div className="font-medium">{DEMO_DATA.student.name}</div>
-            <div className="text-sm text-muted-foreground">
-              {DEMO_DATA.student.university}
-            </div>
-          </div>
-          <button
-            onClick={() => navigate("/")}
-            className="w-full flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground mt-2"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="text-sm">Sign Out</span>
-          </button>
-        </div>
+        <SidebarUserFooter />
       </aside>
 
       {/* Main Content */}
@@ -172,9 +253,9 @@ export default function Dashboard() {
               <div className="flex flex-col items-center">
                 <h2 className="text-xl mb-2">Your F-1 Compliance Risk Score</h2>
                 <p className="text-sm text-muted-foreground mb-6">
-                  Last updated: {DEMO_DATA.student.lastUpdated}
+                  Last updated: {lastUpdated}
                 </p>
-                <RiskScoreGauge score={DEMO_DATA.student.riskScore} size="lg" />
+                <RiskScoreGauge score={riskScore} size="lg" />
               </div>
             </div>
           </motion.div>
@@ -190,20 +271,26 @@ export default function Dashboard() {
             >
               <h3 className="text-lg font-semibold mb-4">Active Risks</h3>
               <div className="space-y-3">
-                {DEMO_DATA.activeRisks.map((risk) => (
-                  <div
-                    key={risk.id}
-                    className="p-3 rounded-lg border border-border bg-background"
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <span className="text-sm font-medium">{risk.title}</span>
-                      <RiskBadge level={risk.severity} />
+                {showBackendRiskEmpty ? (
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    No active compliance flags from your last analysis.
+                  </p>
+                ) : (
+                  activeRisks.map((risk) => (
+                    <div
+                      key={risk.id}
+                      className="p-3 rounded-lg border border-border bg-background"
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <span className="text-sm font-medium">{risk.title}</span>
+                        <RiskBadge level={risk.severity} />
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        {risk.description}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      {risk.description}
-                    </p>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </motion.div>
 
@@ -216,14 +303,20 @@ export default function Dashboard() {
             >
               <h3 className="text-lg font-semibold mb-4">Upcoming Deadlines</h3>
               <div className="space-y-3">
-                {DEMO_DATA.upcomingDeadlines.map((deadline, idx) => (
-                  <DeadlineCountdown
-                    key={idx}
-                    title={deadline.title}
-                    date={deadline.date}
-                    daysRemaining={deadline.days}
-                  />
-                ))}
+                {showBackendDeadlineEmpty ? (
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    No upcoming deadline was computed from your saved profile.
+                  </p>
+                ) : (
+                  upcomingDeadlines.map((deadline, idx) => (
+                    <DeadlineCountdown
+                      key={idx}
+                      title={deadline.title}
+                      date={deadline.date}
+                      daysRemaining={deadline.days}
+                    />
+                  ))
+                )}
               </div>
             </motion.div>
 

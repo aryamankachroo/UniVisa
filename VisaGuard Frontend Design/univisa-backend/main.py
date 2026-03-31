@@ -15,7 +15,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from models.student import StudentProfile, VisaType, EnrollmentStatus
+<<<<<<< HEAD
 from routers import student, chat, dso, cpt, jobs
+=======
+from routers import student, chat, dso, cpt, compliance, cases
+>>>>>>> shrish-updates
 
 app = FastAPI(
     title="UniVisa API",
@@ -46,18 +50,23 @@ app.include_router(student.router)
 app.include_router(chat.router)
 app.include_router(dso.router)
 app.include_router(cpt.router)
+<<<<<<< HEAD
 app.include_router(jobs.router)
+=======
+app.include_router(compliance.router)
+app.include_router(cases.router)
+>>>>>>> shrish-updates
 
 
 def _seed_demo_student() -> None:
-    """Pre-load Riya Sharma demo profile so judges can see risk output without filling the form."""
+    """Pre-load a generic demo profile so the API can be exercised without the questionnaire."""
     store = student.get_student_store()
     if "demo" in store:
         return
     demo = StudentProfile(
         student_id="demo",
-        full_name="Riya Sharma",
-        university="Georgia Institute of Technology",
+        full_name="Demo Student",
+        university="Sample University",
         country_of_origin="India",
         visa_type=VisaType.F1,
         program_start_date=date(2024, 8, 15),

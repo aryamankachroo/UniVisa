@@ -143,7 +143,10 @@ def _vector_search(embedding: list[float], top_k: int = 5) -> list[dict]:
 # Chat: Gemini API only.
 CHAT_SYSTEM_PROMPT = """You are UniVisa's AI advisor for F-1 and J-1 international students in the US. Answer the student's question clearly and specifically. Give a direct answer in your first 1-2 sentences (e.g. "Yes, F-1 students may work up to 20 hours per week on campus" or "Missing the CPT deadline can mean you're not authorized to work—contact your DSO immediately."). Do not reply with only "consult your DSO." Add a brief note at the end: "For your situation, confirm with your DSO." Use plain English. Student profile: {student_context}"""
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> shrish-updates
 def _call_gemini_rest(question: str, system_prompt: str, api_key: str) -> dict:
     """Call Gemini via REST API. Returns {answer, sources}. Works with any valid API key."""
     import json
@@ -190,17 +193,50 @@ def _call_gemini_rest(question: str, system_prompt: str, api_key: str) -> dict:
 
 
 def query_rag(question: str, student_profile: StudentProfile) -> dict:
-    """Answer using Gemini API only."""
+    """RAG: embed question -> vector search -> Gemini with context (or no-context prompt if empty)."""
     student_context = (
         f"University: {student_profile.university}, Visa: {student_profile.visa_type.value}, "
         f"Program ends: {student_profile.program_end_date}, Enrollment: {student_profile.enrollment_status.value}, "
         f"On OPT: {student_profile.on_opt}, Weekly work hours: {student_profile.weekly_work_hours}"
     )
-    system_prompt = CHAT_SYSTEM_PROMPT.format(student_context=student_context)
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
         return {
             "answer": "Add GEMINI_API_KEY to .env (get a key at https://aistudio.google.com/app/apikey) and restart the backend.",
             "sources": [],
         }
+<<<<<<< HEAD
     return _call_gemini_rest(question.strip(), system_prompt, api_key)
+=======
+
+    # Retrieve relevant chunks (RAG)
+    relevant_chunks: list[dict] = []
+    try:
+        model = _get_embedding_model()
+        embedding = model.encode(question.strip()).tolist()
+        relevant_chunks = _vector_search(embedding, top_k=5)
+    except Exception:
+        relevant_chunks = []
+
+    # Build context and choose prompt
+    if relevant_chunks:
+        context = "\n\n".join(
+            f"[{chunk['source']}]\n{chunk['text']}" for chunk in relevant_chunks
+        )
+        system_prompt = SYSTEM_PROMPT.format(student_context=student_context)
+        user_message = (
+            "Context:\n"
+            + context
+            + "\n\nQuestion: "
+            + question.strip()
+        )
+        sources = list(dict.fromkeys(c["source"] for c in relevant_chunks))
+    else:
+        system_prompt = SYSTEM_PROMPT_NO_CONTEXT.format(student_context=student_context)
+        user_message = question.strip()
+        sources = ["UniVisa AI"]
+
+    result = _call_gemini_rest(user_message, system_prompt, api_key)
+    result["sources"] = sources
+    return result
+>>>>>>> shrish-updates

@@ -1,0 +1,44 @@
+OPT Application Process and Filing Requirements
+
+OPT Recommendation and Filing Timeline
+
+Students must not file Form I-765 until the DSO has recommended OPT in SEVIS and issued an updated Form I-20 with the OPT recommendation.
+
+The student must file Form I-765 within 30 days of the DSO's OPT recommendation.
+
+If the Form I-765 is filed before the DSO recommendation or after the 30-day period:
+
+• USCIS will deny the application.
+• The student will lose the filing fee.
+• The student must reapply and pay the fee again.
+
+OPT Request Statuses in SEVIS
+
+Requested – DSO entered OPT recommendation; USCIS has not yet received Form I-765.
+Pending – USCIS has received Form I-765.
+Approved – USCIS approved Form I-765.
+Denied – USCIS denied Form I-765.
+Canceled – OPT request canceled in SEVIS.
+Withdrawn – USCIS approved withdrawal of Form I-765.
+
+Form I-765
+
+Form I-765, Application for Employment Authorization, is used to request employment authorization and an Employment Authorization Document (EAD).
+
+i-765
+
+Purpose of Form I-765
+
+Certain foreign nationals in the United States may file Form I-765 to request employment authorization and an EAD.
+
+i-765instr
+
+Employment Authorization Document (EAD)
+
+The EAD is Form I-766 issued as evidence that the holder is authorized to work in the United States.
+
+i-765instr
+
+Students must enter the appropriate eligibility category in Part 2, Item 27 of Form I-765.
+
+i-765instr
