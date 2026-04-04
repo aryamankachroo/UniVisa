@@ -11,8 +11,10 @@ import { Shield, GraduationCap, Users, ArrowRight } from "lucide-react";
 import { ThemeToggle } from "../components/ThemeToggle";
 
 const API_BASE = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "http://localhost:8000";
-const UNIVERSITIES_API = `${API_BASE}/universities`;
+const INSTITUTIONS_API = `${API_BASE}/api/institutions`;
 const CASES_SUBMIT_API = `${API_BASE}/api/cases/submit`;
+
+type InstitutionOption = { id: string; display_name: string };
 
 function casesMeUrl(clerkUserId: string) {
   return `${API_BASE}/api/cases/me?clerk_user_id=${encodeURIComponent(clerkUserId)}`;
@@ -27,14 +29,6 @@ const COUNTRIES = [
   "Pakistan", "Peru", "Philippines", "Poland", "Portugal", "Romania", "Russia", "Saudi Arabia", "Singapore", "South Africa",
   "Spain", "Sri Lanka", "Sweden", "Switzerland", "Taiwan", "Thailand", "Turkey", "Ukraine", "United Arab Emirates", "United Kingdom",
   "United States", "Venezuela", "Vietnam", "Other",
-];
-
-const TOP_UNIVERSITIES = [
-  "Georgia Institute of Technology",
-  "MIT",
-  "Stanford University",
-  "UC Berkeley",
-  "Carnegie Mellon University",
 ];
 
 type VisaStage = "studying" | "cpt" | "opt" | "stem_opt" | "opt_approved_not_started";
@@ -84,7 +78,13 @@ interface ImmigrationCaseInput {
 
 interface FormData {
   fullName: string;
+  /** Display name for risk engine when using catalog pick */
   university: string;
+  universityPick: "catalog" | "other";
+  /** Supabase institutions.id when universityPick === catalog */
+  institutionId: string;
+  /** Free-text school when universityPick === other (no DSO cohort link) */
+  universityOther: string;
   country: string;
 
   // Visa status (stage only — app is F-1 only)
@@ -134,6 +134,9 @@ export default function Onboarding() {
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
     university: "",
+    universityPick: "catalog",
+    institutionId: "",
+    universityOther: "",
     country: "",
     currentStage: "studying",
     programStart: "",
@@ -167,27 +170,31 @@ export default function Onboarding() {
     deadlines: { nextDeadline: string | null; daysUntilNextDeadline: number | null };
   } | null>(null);
 
-  const [universities, setUniversities] = useState<string[]>(TOP_UNIVERSITIES);
-  const [universitiesLoading, setUniversitiesLoading] = useState(false);
-  const [universitiesError, setUniversitiesError] = useState<string | null>(null);
+  const [institutions, setInstitutions] = useState<InstitutionOption[]>([]);
+  const [institutionsLoading, setInstitutionsLoading] = useState(false);
+  const [institutionsError, setInstitutionsError] = useState<string | null>(null);
 
   /** False while checking whether this signed-in user already has a saved case (skip questionnaire). */
   const [savedCaseLookupDone, setSavedCaseLookupDone] = useState(false);
 
   useEffect(() => {
-    fetch(UNIVERSITIES_API)
+    setInstitutionsLoading(true);
+    setInstitutionsError(null);
+    fetch(INSTITUTIONS_API)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load");
         return res.json();
       })
-      .then((names: string[]) => {
-        if (Array.isArray(names) && names.length > 0) {
-          setUniversities(names);
+      .then((rows: InstitutionOption[]) => {
+        if (Array.isArray(rows)) {
+          setInstitutions(rows);
         }
       })
       .catch(() => {
-        // Keep TOP_UNIVERSITIES as fallback; no error message so dropdown stays usable
-      });
+        setInstitutions([]);
+        setInstitutionsError("Could not load schools. Check that the API is running and Supabase is migrated.");
+      })
+      .finally(() => setInstitutionsLoading(false));
   }, []);
 
   // Returning users: backend already has questionnaire + risk → go straight to dashboard.
@@ -292,9 +299,14 @@ export default function Onboarding() {
         ? false
         : null;
 
+    const uniName =
+      formData.universityPick === "other"
+        ? formData.universityOther.trim()
+        : formData.university.trim();
+
     return {
       fullName: formData.fullName,
-      university: formData.university,
+      university: uniName,
       country: formData.country,
 
       currentStage: formData.currentStage,
@@ -339,6 +351,11 @@ export default function Onboarding() {
     setSubmitError(null);
 
     const immigration_case_input = buildImmigrationCaseInput();
+    if (!immigration_case_input.university.trim()) {
+      setSubmitError("Please select your university or enter your school name.");
+      setSubmitting(false);
+      return;
+    }
 
     try {
       const response = await fetch(CASES_SUBMIT_API, {
@@ -348,6 +365,10 @@ export default function Onboarding() {
         },
         body: JSON.stringify({
           clerkUserId: user.id,
+          institutionId:
+            formData.universityPick === "catalog" && formData.institutionId.trim()
+              ? formData.institutionId.trim()
+              : null,
           immigration_case_input,
         }),
       });
@@ -452,7 +473,7 @@ export default function Onboarding() {
                 </div>
                 <h2 className="text-2xl font-semibold mb-2">I'm a DSO</h2>
                 <p className="text-muted-foreground mb-4">
-                  Monitor compliance across your student cohort with real-time risk dashboard
+                  Open the DSO portal and sign up or sign in with your <strong className="text-foreground font-medium">official school email</strong> to claim your institution and monitor cohort risk.
                 </p>
                 <div className="flex items-center gap-2 text-primary font-medium">
                   <span>View Dashboard</span>
@@ -598,24 +619,65 @@ export default function Onboarding() {
                 </div>
 
                 <div>
-                  <Label htmlFor="university">University Name</Label>
+                  <Label htmlFor="university">University / college</Label>
+                  <p className="text-xs text-muted-foreground mt-1 mb-2">
+                    This links your profile to your school so your DSO can see cohort risk after they register on UniVisa.
+                  </p>
+                  {institutionsError && (
+                    <p className="text-xs text-destructive mb-2">{institutionsError}</p>
+                  )}
                   <Select
-                    value={formData.university}
-                    onValueChange={(value) => updateField("university", value)}
-                    disabled={universitiesLoading}
+                    value={
+                      formData.universityPick === "other"
+                        ? "__other__"
+                        : formData.institutionId || undefined
+                    }
+                    onValueChange={(value) => {
+                      if (value === "__other__") {
+                        setFormData((prev) => ({
+                          ...prev,
+                          universityPick: "other",
+                          institutionId: "",
+                          university: prev.universityOther.trim(),
+                        }));
+                        return;
+                      }
+                      const inst = institutions.find((i) => i.id === value);
+                      setFormData((prev) => ({
+                        ...prev,
+                        universityPick: "catalog",
+                        institutionId: value,
+                        university: inst?.display_name ?? "",
+                      }));
+                    }}
+                    disabled={institutionsLoading}
                   >
-                    <SelectTrigger className="mt-1.5">
-                      <SelectValue placeholder="Select your university" />
+                    <SelectTrigger className="mt-1.5" id="university">
+                      <SelectValue placeholder={institutionsLoading ? "Loading schools…" : "Select your university"} />
                     </SelectTrigger>
-                    <SelectContent>
-                      {universities.map((name) => (
-                        <SelectItem key={name} value={name}>
-                          {name}
+                    <SelectContent className="max-h-[min(60vh,24rem)]">
+                      {institutions.map((inst) => (
+                        <SelectItem key={inst.id} value={inst.id}>
+                          {inst.display_name}
                         </SelectItem>
                       ))}
-                      <SelectItem value="Other">Other</SelectItem>
+                      <SelectItem value="__other__">Other (not listed — no institution link)</SelectItem>
                     </SelectContent>
                   </Select>
+                  {formData.universityPick === "other" && (
+                    <div className="mt-3">
+                      <Label htmlFor="universityOther">School name</Label>
+                      <Input
+                        id="universityOther"
+                        placeholder="Enter your school name"
+                        value={formData.universityOther}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, universityOther: e.target.value, university: e.target.value.trim() }))
+                        }
+                        className="mt-1.5"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -1048,7 +1110,17 @@ export default function Onboarding() {
               Back
             </Button>
             {step < TOTAL_STEPS ? (
-              <Button onClick={() => goToStudentStep(step + 1)} className="bg-primary">
+              <Button
+                onClick={() => {
+                  if (step === 1) {
+                    if (!formData.fullName.trim()) return;
+                    if (formData.universityPick === "catalog" && !formData.institutionId.trim()) return;
+                    if (formData.universityPick === "other" && !formData.universityOther.trim()) return;
+                  }
+                  goToStudentStep(step + 1);
+                }}
+                className="bg-primary"
+              >
                 Continue
               </Button>
             ) : (

@@ -1,15 +1,11 @@
-import { useState, useCallback, useRef } from "react";
-import { Link, useNavigate } from "react-router";
-<<<<<<< HEAD
+import { useState, useCallback, useRef, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   Shield, LayoutDashboard, Bot, User, Bell, LogOut,
   Briefcase, Search, FileText, RefreshCw, ExternalLink,
   BookmarkPlus, BookmarkCheck, ChevronDown, ChevronUp,
   AlertTriangle, Wifi, WifiOff, SlidersHorizontal,
 } from "lucide-react";
-=======
-import { Shield, LayoutDashboard, Bot, User, Bell, Briefcase, Search, FileText } from "lucide-react";
->>>>>>> shrish-updates
 import { ThemeToggle } from "../components/ThemeToggle";
 import { SidebarUserFooter } from "../components/SidebarUserFooter";
 
@@ -45,6 +41,16 @@ interface Job {
 
 type WorkAuthParam = "all" | "cpt" | "opt" | "stem_opt" | "h1b";
 type JobTypeParam  = "all" | "internship" | "fulltime" | "coop";
+
+function parseWorkAuthParam(v: string | null): WorkAuthParam {
+  if (v === "cpt" || v === "opt" || v === "stem_opt" || v === "h1b") return v;
+  return "all";
+}
+
+function parseJobTypeParam(v: string | null): JobTypeParam {
+  if (v === "internship" || v === "fulltime" || v === "coop") return v;
+  return "all";
+}
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
@@ -259,16 +265,6 @@ function JobSkeleton() {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-const PRESET_SEARCHES: { label: string; q: string; auth: WorkAuthParam; type: JobTypeParam }[] = [
-  { label: "🤖 ML/AI Internships",       q: "machine learning AI",        auth: "cpt",      type: "internship" },
-  { label: "💻 SWE OPT Full-time",       q: "software engineer",          auth: "opt",      type: "fulltime"   },
-  { label: "📊 Data Science CPT",        q: "data science data analyst",  auth: "cpt",      type: "internship" },
-  { label: "☁️ Cloud / DevOps OPT",     q: "cloud infrastructure DevOps",auth: "opt",      type: "all"        },
-  { label: "🧬 STEM Research",           q: "research scientist engineer", auth: "stem_opt", type: "all"        },
-  { label: "🏦 Finance / Quant",         q: "quantitative finance analyst",auth: "all",     type: "internship" },
-  { label: "🏢 H-1B Sponsors",          q: "software engineer developer", auth: "h1b",      type: "fulltime"   },
-];
-
 const WORK_AUTH_OPTIONS: { label: string; value: WorkAuthParam }[] = [
   { label: "All Auth",       value: "all"      },
   { label: "F-1 CPT",       value: "cpt"      },
@@ -286,11 +282,12 @@ const JOB_TYPE_OPTIONS: { label: string; value: JobTypeParam }[] = [
 
 export default function JobOpportunities() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeNav, setActiveNav] = useState("opportunities");
-  const [q, setQ] = useState("");
-  const [location, setLocation] = useState("");
-  const [workAuth, setWorkAuth] = useState<WorkAuthParam>("all");
-  const [jobType, setJobType] = useState<JobTypeParam>("all");
+  const [q, setQ] = useState(searchParams.get("q") ?? "");
+  const [location, setLocation] = useState(searchParams.get("location") ?? "");
+  const [workAuth, setWorkAuth] = useState<WorkAuthParam>(parseWorkAuthParam(searchParams.get("work_auth")));
+  const [jobType, setJobType] = useState<JobTypeParam>(parseJobTypeParam(searchParams.get("job_type")));
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -299,6 +296,7 @@ export default function JobOpportunities() {
   const [error, setError] = useState("");
   const [lastQuery, setLastQuery] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+  const lastRunKeyRef = useRef<string>("");
 
   const handleNav = (path: string, nav: string) => { setActiveNav(nav); navigate(path); };
 
@@ -339,14 +337,49 @@ export default function JobOpportunities() {
     }
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); runSearch(q, location, workAuth, jobType); };
+  const updateSearchParams = useCallback((next: {
+    q?: string;
+    location?: string;
+    workAuth?: WorkAuthParam;
+    jobType?: JobTypeParam;
+  } = {}) => {
+    const nextQ = (next.q ?? q).trim();
+    const nextLocation = (next.location ?? location).trim();
+    const nextWorkAuth = next.workAuth ?? workAuth;
+    const nextJobType = next.jobType ?? jobType;
 
-  const handlePreset = (p: typeof PRESET_SEARCHES[0]) => {
-    setQ(p.q);
-    setWorkAuth(p.auth);
-    setJobType(p.type);
-    runSearch(p.q, location, p.auth, p.type);
+    const params = new URLSearchParams();
+    if (nextQ) params.set("q", nextQ);
+    if (nextLocation) params.set("location", nextLocation);
+    if (nextWorkAuth !== "all") params.set("work_auth", nextWorkAuth);
+    if (nextJobType !== "all") params.set("job_type", nextJobType);
+    setSearchParams(params, { replace: true });
+  }, [q, location, workAuth, jobType, setSearchParams]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!q.trim()) return;
+    updateSearchParams();
   };
+
+  useEffect(() => {
+    const qParam = searchParams.get("q") ?? "";
+    const locationParam = searchParams.get("location") ?? "";
+    const workAuthParam = parseWorkAuthParam(searchParams.get("work_auth"));
+    const jobTypeParam = parseJobTypeParam(searchParams.get("job_type"));
+
+    if (q !== qParam) setQ(qParam);
+    if (location !== locationParam) setLocation(locationParam);
+    if (workAuth !== workAuthParam) setWorkAuth(workAuthParam);
+    if (jobType !== jobTypeParam) setJobType(jobTypeParam);
+
+    if (!qParam.trim()) return;
+
+    const runKey = `${qParam}|${locationParam}|${workAuthParam}|${jobTypeParam}`;
+    if (lastRunKeyRef.current === runKey) return;
+    lastRunKeyRef.current = runKey;
+    runSearch(qParam, locationParam, workAuthParam, jobTypeParam);
+  }, [searchParams, runSearch]);
 
   const toggleSave = (id: string) =>
     setSavedIds((prev) => prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]);
@@ -417,7 +450,10 @@ export default function JobOpportunities() {
                       <button
                         key={o.value}
                         type="button"
-                        onClick={() => setWorkAuth(o.value)}
+                        onClick={() => {
+                          setWorkAuth(o.value);
+                          if (q.trim()) updateSearchParams({ workAuth: o.value });
+                        }}
                         className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${workAuth === o.value ? "bg-primary text-primary-foreground" : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border"}`}
                       >
                         {o.label}
@@ -432,7 +468,10 @@ export default function JobOpportunities() {
                       <button
                         key={o.value}
                         type="button"
-                        onClick={() => setJobType(o.value)}
+                        onClick={() => {
+                          setJobType(o.value);
+                          if (q.trim()) updateSearchParams({ jobType: o.value });
+                        }}
                         className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${jobType === o.value ? "bg-primary text-primary-foreground" : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border"}`}
                       >
                         {o.label}
@@ -452,23 +491,6 @@ export default function JobOpportunities() {
               </div>
             )}
           </form>
-
-          {/* Preset searches */}
-          <div className="mb-6">
-            <p className="text-xs text-muted-foreground mb-2 font-medium">Quick searches:</p>
-            <div className="flex gap-2 flex-wrap">
-              {PRESET_SEARCHES.map((p) => (
-                <button
-                  key={p.label}
-                  onClick={() => handlePreset(p)}
-                  disabled={status === "loading"}
-                  className="rounded-full px-3.5 py-1.5 text-xs font-medium bg-muted/50 text-muted-foreground hover:bg-primary/10 hover:text-primary border border-border transition-colors disabled:opacity-50"
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
 
           {/* ── States ── */}
 
@@ -513,7 +535,7 @@ export default function JobOpportunities() {
                 </p>
               )}
               <button
-                onClick={() => runSearch(lastQuery, location, workAuth, jobType)}
+                onClick={() => updateSearchParams({ q: lastQuery })}
                 className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90 transition-opacity"
               >
                 Try Again
@@ -529,7 +551,7 @@ export default function JobOpportunities() {
                   <span className="text-foreground">"{lastQuery}"</span>
                 </span>
                 <button
-                  onClick={() => runSearch(lastQuery, location, workAuth, jobType)}
+                  onClick={() => updateSearchParams({ q: lastQuery })}
                   className="ml-auto rounded-lg px-3 py-1.5 text-xs border border-border bg-muted/50 text-muted-foreground hover:bg-muted transition-colors flex items-center gap-1"
                 >
                   <RefreshCw className="w-3 h-3" /> Refresh

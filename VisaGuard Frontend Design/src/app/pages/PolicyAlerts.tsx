@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Shield, LayoutDashboard, Bot, User, Bell, Briefcase, Search, FileText } from "lucide-react";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { SidebarUserFooter } from "../components/SidebarUserFooter";
+import { getPolicyAlerts, type PolicyAlert } from "../api";
 
 export type PolicyAlertItem = {
   id: string;
@@ -74,6 +75,20 @@ const POLICY_ALERTS: PolicyAlertItem[] = [
   },
 ];
 
+function toUiAlert(a: PolicyAlert, idx: number): PolicyAlertItem {
+  const date = a.published_at ? new Date(a.published_at).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "Ongoing";
+  return {
+    id: a.fingerprint ?? `policy-${idx}`,
+    title: a.title,
+    description: a.description,
+    date,
+    sourceName: a.source_name,
+    sourceUrl: a.source_url,
+    severity: (a.severity === "high" || a.severity === "medium" || a.severity === "info") ? a.severity : "info",
+    visaRelevance: Array.isArray(a.visa_relevance) ? a.visa_relevance : [],
+  };
+}
+
 function Sidebar({
   activeNav,
   onNav,
@@ -123,11 +138,26 @@ function Sidebar({
 export default function PolicyAlerts() {
   const navigate = useNavigate();
   const [activeNav, setActiveNav] = useState("policy");
+  const [alerts, setAlerts] = useState<PolicyAlertItem[]>(POLICY_ALERTS);
+  const [loading, setLoading] = useState(true);
 
   const handleNav = (path: string, nav: string) => {
     setActiveNav(nav);
     navigate(path);
   };
+
+  useEffect(() => {
+    getPolicyAlerts(50)
+      .then((rows) => {
+        if (Array.isArray(rows) && rows.length > 0) {
+          setAlerts(rows.map(toUiAlert));
+        }
+      })
+      .catch(() => {
+        setAlerts(POLICY_ALERTS);
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const severityStyles = {
     high: "border-l-amber-500 bg-amber-500/5 border-amber-500/30",
@@ -144,8 +174,9 @@ export default function PolicyAlerts() {
             <h1 className="text-3xl font-semibold mb-2">Policy Alerts</h1>
           </div>
 
+          {loading && <p className="text-sm text-muted-foreground mb-4">Loading policy alerts…</p>}
           <div className="space-y-4">
-            {POLICY_ALERTS.map((alert) => (
+            {alerts.map((alert) => (
               <article
                 key={alert.id}
                 className={`rounded-xl border border-border bg-card overflow-hidden border-l-4 ${severityStyles[alert.severity]}`}
@@ -161,6 +192,9 @@ export default function PolicyAlerts() {
                       {alert.title}
                     </a>
                   </h2>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    {alert.sourceName} · {alert.date}
+                  </p>
                   <p className="text-sm text-muted-foreground leading-relaxed">{alert.description}</p>
                 </div>
               </article>

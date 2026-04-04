@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
 import { useUser } from "@clerk/react";
 import {
@@ -16,6 +16,16 @@ import {
 import { ThemeToggle } from "../components/ThemeToggle";
 import { SidebarUserFooter } from "../components/SidebarUserFooter";
 import { Button } from "../components/ui/button";
+import { Switch } from "../components/ui/switch";
+import { Label } from "../components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import { fetchInstitutionCatalog, patchProfileInstitution, patchProfileSharing, type InstitutionRow } from "../api";
 import { RiskScoreGauge } from "../components/RiskScoreGauge";
 import { RiskBadge } from "../components/RiskBadge";
 import { motion } from "motion/react";
@@ -178,6 +188,22 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
 
   const [localCase, setLocalCase] = useState<Record<string, unknown> | null>(null);
+  const [shareWithDso, setShareWithDso] = useState(true);
+  const [shareSaving, setShareSaving] = useState(false);
+
+  const [institutions, setInstitutions] = useState<InstitutionRow[]>([]);
+  const [institutionsLoading, setInstitutionsLoading] = useState(false);
+  const [institutionsError, setInstitutionsError] = useState<string | null>(null);
+  const [institutionPicker, setInstitutionPicker] = useState<string>("__none__");
+  const [institutionLinkSaving, setInstitutionLinkSaving] = useState(false);
+
+  const refreshCaseData = useCallback(async () => {
+    if (!user?.id) return;
+    const res = await fetch(`${API_BASE}/api/cases/me?clerk_user_id=${encodeURIComponent(user.id)}`);
+    if (!res.ok) return;
+    const data = (await res.json()) as CasePayload;
+    setCaseData(data);
+  }, [user?.id]);
 
   useEffect(() => {
     try {
@@ -222,6 +248,51 @@ export default function Profile() {
     };
   }, [isLoaded, user?.id]);
 
+  useEffect(() => {
+    const p = caseData?.profile as Record<string, unknown> | undefined;
+    if (!p) return;
+    const v = p.share_with_institution;
+    if (typeof v === "boolean") setShareWithDso(v);
+  }, [caseData?.profile]);
+
+  useEffect(() => {
+    const p = caseData?.profile as Record<string, unknown> | undefined;
+    if (!p) return;
+    const pid = p.institution_id;
+    const id =
+      typeof pid === "string" && pid.trim()
+        ? pid.trim()
+        : typeof pid === "number"
+          ? String(pid)
+          : "";
+    setInstitutionPicker(id || "__none__");
+  }, [caseData?.profile]);
+
+  useEffect(() => {
+    if (!isLoaded || !user?.id || !caseData?.profile) return;
+    let cancelled = false;
+    setInstitutionsLoading(true);
+    setInstitutionsError(null);
+    fetchInstitutionCatalog()
+      .then((rows) => {
+        if (!cancelled) {
+          const sorted = [...rows].sort((a, b) =>
+            (a.display_name || "").localeCompare(b.display_name || "", undefined, { sensitivity: "base" })
+          );
+          setInstitutions(sorted);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setInstitutionsError("Could not load school list. Check that the API is running.");
+      })
+      .finally(() => {
+        if (!cancelled) setInstitutionsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, user?.id, caseData?.profile]);
+
   const q = useMemo(
     () => (caseData?.questionnaire ?? localCase) as Record<string, unknown> | null,
     [caseData?.questionnaire, localCase]
@@ -229,6 +300,14 @@ export default function Profile() {
 
   const prof = caseData?.profile as Record<string, unknown> | undefined;
   const risk = caseData?.risk as Record<string, unknown> | undefined;
+
+  const catalogInstitutionLinked = useMemo(() => {
+    const linkedId = prof?.institution_id;
+    return Boolean(
+      (typeof linkedId === "string" && linkedId.trim()) ||
+        (typeof linkedId === "number" && String(linkedId))
+    );
+  }, [prof?.institution_id]);
 
   const clerkName =
     user && (user.fullName || [user.firstName, user.lastName].filter(Boolean).join(" ").trim())
@@ -506,6 +585,114 @@ export default function Profile() {
               <ProfileField label="Country of origin" value={country} />
             </dl>
           </SectionCard>
+
+          {caseData?.profile ? (
+            <SectionCard
+              title="School link for DSO dashboard"
+              subtitle="DSOs only see students who share the same linked catalog school they claimed. Turning on visibility is not enough if this link is missing."
+            >
+              <div className="space-y-4">
+                {!catalogInstitutionLinked ? (
+                  <p className="text-sm rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-950 dark:text-amber-100">
+                    Your account is not linked to a catalog school yet, so you will not appear on any institution
+                    cohort list even if &quot;DSO visibility&quot; is on. Select your school below and save.
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    You are linked to the catalog entry used for DSO matching. You can change or clear the link here.
+                  </p>
+                )}
+                {institutionsError ? <p className="text-xs text-destructive">{institutionsError}</p> : null}
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                  <div className="flex-1 space-y-2">
+                    <Label htmlFor="profile-institution">Catalog school</Label>
+                    <Select
+                      value={institutionPicker}
+                      onValueChange={setInstitutionPicker}
+                      disabled={institutionsLoading || institutionLinkSaving}
+                    >
+                      <SelectTrigger id="profile-institution" className="w-full">
+                        <SelectValue
+                          placeholder={institutionsLoading ? "Loading schools…" : "Select your university"}
+                        />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[min(24rem,70vh)]">
+                        <SelectItem value="__none__">Not linked / other (not in list)</SelectItem>
+                        {institutions.map((inst) => (
+                          <SelectItem key={inst.id} value={inst.id}>
+                            {inst.display_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    disabled={institutionLinkSaving || !user || institutionsLoading}
+                    onClick={async () => {
+                      if (!user) return;
+                      const nextId = institutionPicker === "__none__" ? null : institutionPicker;
+                      const curRaw = prof?.institution_id;
+                      const curId =
+                        typeof curRaw === "string" && curRaw.trim()
+                          ? curRaw.trim()
+                          : typeof curRaw === "number"
+                            ? String(curRaw)
+                            : null;
+                      if (nextId === curId || (nextId == null && curId == null)) return;
+                      setInstitutionLinkSaving(true);
+                      try {
+                        await patchProfileInstitution(user.id, nextId);
+                        await refreshCaseData();
+                      } catch {
+                        setInstitutionPicker(curId || "__none__");
+                      } finally {
+                        setInstitutionLinkSaving(false);
+                      }
+                    }}
+                  >
+                    {institutionLinkSaving ? "Saving…" : "Save school link"}
+                  </Button>
+                </div>
+              </div>
+            </SectionCard>
+          ) : null}
+
+          {caseData?.profile ? (
+            <SectionCard
+              title="DSO visibility"
+              subtitle="Control whether your school’s DSO can see you on the institution risk dashboard when they use UniVisa."
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg border border-border bg-muted/20 p-4">
+                <div className="space-y-1">
+                  <Label htmlFor="share-dso" className="text-base font-medium">
+                    Show my summary to my institution’s DSO portal
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    When off, you stay in UniVisa for your own planning but are hidden from the school cohort list.
+                  </p>
+                </div>
+                <Switch
+                  id="share-dso"
+                  checked={shareWithDso}
+                  disabled={shareSaving || !user}
+                  onCheckedChange={async (checked) => {
+                    if (!user) return;
+                    const prev = shareWithDso;
+                    setShareWithDso(checked);
+                    setShareSaving(true);
+                    try {
+                      await patchProfileSharing(user.id, checked);
+                    } catch {
+                      setShareWithDso(prev);
+                    } finally {
+                      setShareSaving(false);
+                    }
+                  }}
+                />
+              </div>
+            </SectionCard>
+          ) : null}
 
           {hasQuestionnaire ? (
             <>

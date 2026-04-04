@@ -7,8 +7,8 @@ from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
-ADZUNA_APP_ID = os.getenv("ADZUNA_APP_ID", "")
-ADZUNA_APP_KEY = os.getenv("ADZUNA_APP_KEY", "")
+ADZUNA_APP_ID = os.getenv("ADZUNA_APP_ID", "").strip()
+ADZUNA_APP_KEY = os.getenv("ADZUNA_APP_KEY", "").strip()
 ADZUNA_BASE = "https://api.adzuna.com/v1/api/jobs/us/search"
 
 INTL_FRIENDLY_KEYWORDS = [
@@ -30,6 +30,67 @@ EXCLUSION_KEYWORDS = [
     "will not sponsor","sponsorship not available",
     "greencard only","green card only"
 ]
+
+QUERY_NORMALIZATIONS = {
+    # Common abbreviations / noisy terms
+    "ml": "machine learning",
+    "ai": "artificial intelligence",
+    "sde": "software engineer",
+    "swe": "software engineer",
+    "devops": "devops",
+}
+
+
+def _normalized_query(q: str) -> str:
+    tokens = re.findall(r"[a-zA-Z0-9\+\#\-]+", q.lower())
+    expanded: list[str] = []
+    for t in tokens:
+        if t in QUERY_NORMALIZATIONS:
+            expanded.extend(QUERY_NORMALIZATIONS[t].split())
+        else:
+            expanded.append(t)
+    return " ".join(expanded).strip()
+
+
+def _build_query_candidates(q: str) -> list[str]:
+    """
+    Build broad, forgiving query variants so adding extra words doesn't collapse results.
+    Order matters: try most specific first, then broader fallbacks.
+    """
+    base = (q or "").strip()
+    if not base:
+        return ["software engineer"]
+
+    normalized = _normalized_query(base)
+    tokens = normalized.split()
+
+    candidates: list[str] = [base]
+    if normalized and normalized != base.lower():
+        candidates.append(normalized)
+
+    # Keep the first 2-3 intent-bearing words as broad fallback.
+    if len(tokens) >= 2:
+        candidates.append(" ".join(tokens[:2]))
+    if len(tokens) >= 3:
+        candidates.append(" ".join(tokens[:3]))
+
+    # Head + tail captures cases like "ml engineer ai" -> "machine learning engineer"
+    if len(tokens) >= 3:
+        candidates.append(" ".join(tokens[:-1]))
+
+    # Final generic fallback
+    candidates.append(tokens[0] if tokens else "software engineer")
+
+    # De-duplicate while preserving order.
+    seen = set()
+    out: list[str] = []
+    for c in candidates:
+        c = c.strip()
+        if c and c not in seen:
+            seen.add(c)
+            out.append(c)
+    return out
+
 
 def detect_visa_types(text):
     t = text.lower()
@@ -72,11 +133,9 @@ def fetch_adzuna(keyword, location="", results_per_page=50, page=1):
         "app_id": ADZUNA_APP_ID,
         "app_key": ADZUNA_APP_KEY,
         "results_per_page": results_per_page,
-        "page": page,
         "what": keyword,
-        "content-type": "application/json",
         "sort_by": "date",
-        "salary_include_unknown": 1
+        "salary_include_unknown": 1,
     }
 
     if location:
@@ -89,7 +148,14 @@ def fetch_adzuna(keyword, location="", results_per_page=50, page=1):
             data = json.loads(resp.read().decode())
         return data.get("results", [])
     except urllib.error.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Adzuna API error: {e.code}")
+        detail = f"Adzuna API error: {e.code}"
+        try:
+            body = e.read().decode(errors="ignore").strip()
+            if body:
+                detail = f"{detail} - {body[:400]}"
+        except Exception:
+            pass
+        raise HTTPException(status_code=502, detail=detail)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Failed to reach Adzuna: {e}")
 
@@ -165,6 +231,36 @@ def normalize_job(raw, visa_types):
     }
 
 
+def _matches_filters(job: dict, work_auth: str, job_type: str) -> bool:
+    if job_type != "all":
+        wanted_type = {
+            "internship": "Internship",
+            "fulltime": "Full-time",
+            "coop": "Co-op",
+        }.get(job_type)
+        if wanted_type and job.get("type") != wanted_type:
+            return False
+
+    if work_auth != "all":
+        wanted_auth = {
+            "cpt": "F-1 CPT",
+            "opt": "F-1 OPT",
+            "stem_opt": "OPT STEM Extension",
+            "h1b": "H-1B Sponsor",
+        }.get(work_auth)
+        visa_types = job.get("visaTypes") or []
+        if wanted_auth and wanted_auth not in visa_types:
+            # If posting has no explicit visa markers, allow CPT/OPT/STEM filters
+            # to keep search usable (user still verifies with employer/DSO).
+            if visa_types == [] and work_auth in {"cpt", "opt", "stem_opt"}:
+                return True
+            # H-1B sometimes appears as sponsorship signal, even if label missing.
+            if not (work_auth == "h1b" and job.get("sponsorship")):
+                return False
+
+    return True
+
+
 @router.get("")
 def search_jobs(
     q: str = Query(default="software engineer intern"),
@@ -173,22 +269,49 @@ def search_jobs(
     job_type: str = Query(default="all"),
     page: int = Query(default=1)
 ):
-    enhanced_q = f"{q} international student visa sponsor"
+    jobs: list[dict] = []
+    seen_job_ids: set[str] = set()
 
-    raw_results = fetch_adzuna(keyword=enhanced_q, location=location, page=page)
+    for candidate_q in _build_query_candidates(q):
+        raw_results = fetch_adzuna(keyword=candidate_q, location=location, page=page)
 
-    jobs = []
+        # Pass 1: strict international-friendly filter
+        for raw in raw_results:
+            title = raw.get("title", "")
+            desc = raw.get("description", "")
+            if not is_international_friendly(title, desc):
+                continue
 
-    for raw in raw_results:
-        title = raw.get("title", "")
-        desc = raw.get("description", "")
+            visa_types = detect_visa_types(title + " " + desc)
+            job = normalize_job(raw, visa_types)
+            job_id = str(job.get("id", ""))
+            if not job_id or job_id in seen_job_ids:
+                continue
+            if _matches_filters(job, work_auth=work_auth, job_type=job_type):
+                jobs.append(job)
+                seen_job_ids.add(job_id)
+                if len(jobs) >= 25:
+                    return jobs
 
-        if not is_international_friendly(title, desc):
-            continue
+        # Pass 2: relaxed fallback on same candidate (if still empty)
+        if not jobs:
+            for raw in raw_results:
+                title = raw.get("title", "")
+                desc = raw.get("description", "")
+                visa_types = detect_visa_types(title + " " + desc)
+                job = normalize_job(raw, visa_types)
+                job_id = str(job.get("id", ""))
+                if not job_id or job_id in seen_job_ids:
+                    continue
+                if _matches_filters(job, work_auth=work_auth, job_type=job_type):
+                    jobs.append(job)
+                    seen_job_ids.add(job_id)
+                    if len(jobs) >= 25:
+                        return jobs
 
-        visa_types = detect_visa_types(title + " " + desc)
-
-        jobs.append(normalize_job(raw, visa_types))
+        # If we already found something, avoid unnecessary API calls.
+        if jobs:
+            break
 
     return jobs
 

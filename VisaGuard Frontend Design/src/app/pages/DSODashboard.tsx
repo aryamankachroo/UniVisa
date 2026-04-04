@@ -1,7 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router";
+import { SignInButton, SignUpButton, useAuth, useClerk } from "@clerk/react";
 import { Shield, Users, TrendingUp, AlertTriangle, CheckCircle, Briefcase } from "lucide-react";
-import { listDsoCPTRequests, type DsoCPTRequest } from "../api";
+import {
+  listDsoCPTRequests,
+  type DsoCPTRequest,
+  type DsoStudentRowApi,
+  fetchDsoMe,
+  fetchDsoStudents,
+  claimDsoInstitution,
+  fetchInstitutionCatalog,
+  type InstitutionRow,
+} from "../api";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { StudentRow } from "../components/StudentRow";
 import { RiskBadge } from "../components/RiskBadge";
@@ -23,6 +33,20 @@ import {
 } from "../components/ui/select";
 import { motion } from "motion/react";
 import { toast } from "sonner";
+import { Input } from "../components/ui/input";
+
+const DEV_API_HINT =
+  "Backend: set CLERK_JWKS_URL and CLERK_JWT_ISSUER. Clerk: add `email` from user.primary_email_address to the session token so institution claim can check your domain.";
+
+function riskBandFromApi(row: DsoStudentRowApi): "high" | "medium" | "low" {
+  const rl = row.risk_level?.toUpperCase();
+  if (rl === "HIGH" || rl === "CRITICAL") return "high";
+  if (rl === "MEDIUM") return "medium";
+  if (rl === "LOW") return "low";
+  if (row.risk_score > 70) return "high";
+  if (row.risk_score >= 40) return "medium";
+  return "low";
+}
 
 const SCHEDULE_TIME_SLOTS = [
   "8:00 AM", "8:30 AM", "9:00 AM", "9:30 AM", "10:00 AM", "10:30 AM",
@@ -30,142 +54,108 @@ const SCHEDULE_TIME_SLOTS = [
   "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM", "4:00 PM", "4:30 PM", "5:00 PM",
 ];
 
-const STUDENTS_DATA = [
-  {
-    id: 1,
-    name: "Jordan Kim",
-    country: "India",
-    visa: "F-1",
-    programEnd: "May 15, 2026",
-    riskScore: 74,
-    topRiskFlag: "OPT application deadline approaching",
-    lastActive: "2 hours ago",
-    details: {
-      email: "jordan.kim@example.edu",
-      major: "Computer Science MS",
-      enrollmentStatus: "Full-time",
-      workHours: 18,
-      risks: [
-        "OPT application window opens in 18 days",
-        "Work hours approaching 20hr limit",
-        "Program end date in 84 days",
-      ],
-    },
-  },
-  {
-    id: 2,
-    name: "Wei Chen",
-    country: "China",
-    visa: "F-1",
-    programEnd: "Dec 20, 2026",
-    riskScore: 68,
-    topRiskFlag: "Address change not reported",
-    lastActive: "1 day ago",
-    details: {
-      email: "wei.chen@gatech.edu",
-      major: "Electrical Engineering PhD",
-      enrollmentStatus: "Full-time",
-      workHours: 20,
-      risks: [
-        "Address change pending USCIS notification",
-        "SEVIS fee renewal due in 45 days",
-      ],
-    },
-  },
-  {
-    id: 3,
-    name: "Carlos Rodriguez",
-    country: "Mexico",
-    visa: "F-1",
-    programEnd: "Aug 15, 2027",
-    riskScore: 45,
-    topRiskFlag: "Travel documentation needs review",
-    lastActive: "3 hours ago",
-    details: {
-      email: "carlos.rodriguez@gatech.edu",
-      major: "Mechanical Engineering MS",
-      enrollmentStatus: "Full-time",
-      workHours: 15,
-      risks: [
-        "Upcoming international travel in 30 days",
-        "I-20 signature expiring soon",
-      ],
-    },
-  },
-  {
-    id: 4,
-    name: "Aisha Patel",
-    country: "India",
-    visa: "J-1",
-    programEnd: "Jun 30, 2026",
-    riskScore: 28,
-    topRiskFlag: "All requirements met",
-    lastActive: "5 hours ago",
-    details: {
-      email: "aisha.patel@gatech.edu",
-      major: "Business Administration MBA",
-      enrollmentStatus: "Full-time",
-      workHours: 10,
-      risks: [],
-    },
-  },
-  {
-    id: 5,
-    name: "Kim Min-jun",
-    country: "South Korea",
-    visa: "F-1",
-    programEnd: "May 20, 2026",
-    riskScore: 82,
-    topRiskFlag: "CPT authorization expiring",
-    lastActive: "30 mins ago",
-    details: {
-      email: "kim.minjun@gatech.edu",
-      major: "Computer Science BS",
-      enrollmentStatus: "Full-time",
-      workHours: 20,
-      risks: [
-        "CPT authorization expires in 7 days",
-        "Needs new employment authorization",
-        "Program completion in 84 days",
-      ],
-    },
-  },
-];
-
-const SUMMARY_STATS = {
-  total: 847,
-  highRisk: 23,
-  mediumRisk: 156,
-  compliant: 668,
-};
-
 const CPT_STATUS: Record<string, string> = { intent: "Early alert (no offer yet)", offer_signed: "Offer signed — pending", approved: "Approved", rejected: "Rejected" };
 
 export default function DSODashboard() {
   const navigate = useNavigate();
-  const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
+  const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { signOut } = useClerk();
+  const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"riskScore" | "name">("riskScore");
   const [cptRequests, setCptRequests] = useState<DsoCPTRequest[]>([]);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
 
+  const [dsoStudents, setDsoStudents] = useState<DsoStudentRowApi[]>([]);
+  const [dsoSummary, setDsoSummary] = useState({
+    total: 0,
+    high_risk: 0,
+    medium_risk: 0,
+    compliant: 0,
+  });
+  const [institutionName, setInstitutionName] = useState<string | null>(null);
+  const [dsoLoading, setDsoLoading] = useState(true);
+  const [dsoError, setDsoError] = useState<string | null>(null);
+  const [needsClaim, setNeedsClaim] = useState(false);
+  const [claimCatalog, setClaimCatalog] = useState<InstitutionRow[]>([]);
+  const [claimFilter, setClaimFilter] = useState("");
+  const [claimBusy, setClaimBusy] = useState(false);
+
+  const loadCohort = useCallback(async () => {
+    const token = await getToken();
+    if (!token) {
+      setDsoLoading(false);
+      return;
+    }
+    setDsoError(null);
+    try {
+      const me = await fetchDsoMe(token);
+      if (!me.institution_id) {
+        setNeedsClaim(true);
+        setInstitutionName(null);
+        setDsoStudents([]);
+        setDsoSummary({ total: 0, high_risk: 0, medium_risk: 0, compliant: 0 });
+        const cat = await fetchInstitutionCatalog().catch(() => []);
+        setClaimCatalog(cat);
+        return;
+      }
+      setNeedsClaim(false);
+      setInstitutionName(me.display_name);
+      const data = await fetchDsoStudents(token);
+      setDsoStudents(data.students);
+      setDsoSummary(data.summary);
+    } catch (e) {
+      setDsoError(e instanceof Error ? e.message : "Could not load DSO data");
+      setNeedsClaim(false);
+    } finally {
+      setDsoLoading(false);
+    }
+  }, [getToken]);
+
   useEffect(() => {
     listDsoCPTRequests().then(setCptRequests).catch(() => {});
   }, []);
 
-  const sortedStudents = [...STUDENTS_DATA].sort((a, b) => {
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) {
+      setDsoLoading(false);
+      return;
+    }
+    setDsoLoading(true);
+    loadCohort();
+  }, [isLoaded, isSignedIn, loadCohort]);
+
+  const sortedStudents = [...dsoStudents].sort((a, b) => {
     if (sortBy === "riskScore") {
-      return b.riskScore - a.riskScore;
+      return b.risk_score - a.risk_score;
     }
     return a.name.localeCompare(b.name);
   });
 
-  const selectedStudentData = STUDENTS_DATA.find((s) => s.id === selectedStudent);
+  const selectedStudentData = sortedStudents.find((s) => s.clerk_user_id === selectedStudent) ?? null;
+
+  const filteredClaimCatalog = claimCatalog.filter((r) =>
+    r.display_name.toLowerCase().includes(claimFilter.trim().toLowerCase())
+  );
+
+  async function handleClaimInstitution(institutionId: string) {
+    setClaimBusy(true);
+    try {
+      const token = await getToken();
+      await claimDsoInstitution(token, institutionId);
+      toast.success("Institution linked to your account.");
+      setNeedsClaim(false);
+      await loadCohort();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Claim failed");
+    } finally {
+      setClaimBusy(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="bg-card border-b border-border px-8 py-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
@@ -177,15 +167,131 @@ export default function DSODashboard() {
           </Link>
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <span className="text-sm text-muted-foreground">Institution</span>
-            <Button variant="outline" size="sm" onClick={() => navigate("/")}>
-              Sign Out
-            </Button>
+            {isLoaded && isSignedIn ? (
+              <>
+                <span className="text-sm text-muted-foreground max-w-[200px] truncate" title={institutionName ?? undefined}>
+                  {institutionName ?? "Institution"}
+                </span>
+                <Button variant="outline" size="sm" onClick={() => signOut(() => navigate("/"))}>
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <SignUpButton mode="modal">
+                  <Button variant="outline" size="sm">
+                    Register with school email
+                  </Button>
+                </SignUpButton>
+                <SignInButton mode="modal">
+                  <Button variant="default" size="sm">
+                    Sign in
+                  </Button>
+                </SignInButton>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto p-8">
+        {isLoaded && !isSignedIn ? (
+          <div className="max-w-xl space-y-6">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-primary mb-2">Institution access</p>
+              <h1 className="text-2xl font-semibold mb-2">DSO portal — official school email only</h1>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                UniVisa is set up for <strong className="text-foreground font-medium">email sign-up and sign-in</strong>
+                . Use your <strong className="text-foreground font-medium">official institutional address</strong> (for
+                example your <span className="whitespace-nowrap">@university.edu</span> work email), not a personal Gmail
+                or Yahoo account. That email is used to verify your school when you claim your institution on the next
+                step.
+              </p>
+            </div>
+            <ul className="text-sm text-muted-foreground space-y-2 border border-border rounded-lg p-4 bg-muted/30">
+              <li className="flex gap-2">
+                <span className="text-primary font-semibold shrink-0">1.</span>
+                <span>New to UniVisa? Create an account with your college email.</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="text-primary font-semibold shrink-0">2.</span>
+                <span>Returning? Sign in with the same institutional email.</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="text-primary font-semibold shrink-0">3.</span>
+                <span>After sign-in, search for your school and claim it to open the risk dashboard.</span>
+              </li>
+            </ul>
+            <div className="flex flex-wrap items-center gap-3">
+              <SignUpButton mode="modal">
+                <Button size="lg" className="min-w-[200px]">
+                  Register with school email
+                </Button>
+              </SignUpButton>
+              <SignInButton mode="modal">
+                <Button size="lg" variant="outline" className="min-w-[160px]">
+                  Sign in
+                </Button>
+              </SignInButton>
+            </div>
+            <p className="text-xs text-muted-foreground">{DEV_API_HINT}</p>
+          </div>
+        ) : null}
+
+        {isLoaded && isSignedIn ? (
+          <>
+          {dsoLoading && (
+            <p className="text-sm text-muted-foreground mb-6">Loading dashboard…</p>
+          )}
+
+          {!dsoLoading && dsoError && (
+            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 mb-6 text-sm">
+              <p className="font-medium text-destructive">Could not load dashboard</p>
+              <p className="text-muted-foreground mt-1">{dsoError}</p>
+              <p className="text-xs text-muted-foreground mt-2">{DEV_API_HINT}</p>
+            </div>
+          )}
+
+          {!dsoLoading && needsClaim && !dsoError && (
+            <div className="max-w-2xl space-y-4 mb-10">
+              <h1 className="text-2xl font-semibold">Claim your institution</h1>
+              <p className="text-muted-foreground text-sm">
+                You are signed in with your institutional email. Search for your school and claim it. The{" "}
+                <strong className="text-foreground font-medium">first DSO</strong> to claim a school sets which{" "}
+                <strong className="text-foreground font-medium">email domain</strong> may access this dashboard (taken
+                from your sign-in address). Other DSOs at the same college must register or sign in with an address on
+                that same domain.
+              </p>
+              <Input
+                placeholder="Filter schools…"
+                value={claimFilter}
+                onChange={(e) => setClaimFilter(e.target.value)}
+                className="max-w-md"
+              />
+              <div className="border border-border rounded-lg max-h-[min(50vh,24rem)] overflow-y-auto divide-y divide-border">
+                {filteredClaimCatalog.slice(0, 200).map((row) => (
+                  <div key={row.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+                    <span className="min-w-0">{row.display_name}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={claimBusy}
+                      onClick={() => handleClaimInstitution(row.id)}
+                    >
+                      Claim
+                    </Button>
+                  </div>
+                ))}
+                {filteredClaimCatalog.length === 0 && (
+                  <p className="p-4 text-sm text-muted-foreground">No schools match. Run the SQL migration and ensure the API can reach Supabase.</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!dsoLoading && !needsClaim && !dsoError && (
+            <>
         <div className="mb-8">
           <h1 className="text-3xl font-semibold mb-2">International Student Risk Dashboard</h1>
           <p className="text-muted-foreground">
@@ -193,7 +299,6 @@ export default function DSODashboard() {
           </p>
         </div>
 
-        {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -203,7 +308,7 @@ export default function DSODashboard() {
             <div className="flex items-start justify-between mb-2">
               <Users className="w-8 h-8 text-primary" />
             </div>
-            <div className="text-3xl font-bold mb-1">{SUMMARY_STATS.total}</div>
+            <div className="text-3xl font-bold mb-1">{dsoSummary.total}</div>
             <div className="text-sm text-muted-foreground">Total International Students</div>
           </motion.div>
 
@@ -217,7 +322,7 @@ export default function DSODashboard() {
               <AlertTriangle className="w-8 h-8 text-[#FF4D4D]" />
             </div>
             <div className="text-3xl font-bold mb-1 text-[#FF4D4D]">
-              {SUMMARY_STATS.highRisk}
+              {dsoSummary.high_risk}
             </div>
             <div className="text-sm text-muted-foreground">High Risk Students</div>
           </motion.div>
@@ -232,7 +337,7 @@ export default function DSODashboard() {
               <TrendingUp className="w-8 h-8 text-[#FFB347]" />
             </div>
             <div className="text-3xl font-bold mb-1 text-[#FFB347]">
-              {SUMMARY_STATS.mediumRisk}
+              {dsoSummary.medium_risk}
             </div>
             <div className="text-sm text-muted-foreground">Medium Risk</div>
           </motion.div>
@@ -247,7 +352,7 @@ export default function DSODashboard() {
               <CheckCircle className="w-8 h-8 text-[#4CAF50]" />
             </div>
             <div className="text-3xl font-bold mb-1 text-[#4CAF50]">
-              {SUMMARY_STATS.compliant}
+              {dsoSummary.compliant}
             </div>
             <div className="text-sm text-muted-foreground">Compliant</div>
           </motion.div>
@@ -327,18 +432,34 @@ export default function DSODashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedStudents.map((student) => (
-                      <StudentRow
-                        key={student.id}
-                        {...student}
-                        isExpanded={selectedStudent === student.id}
-                        onClick={() =>
-                          setSelectedStudent(
-                            selectedStudent === student.id ? null : student.id
-                          )
-                        }
-                      />
-                    ))}
+                    {sortedStudents.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                          No students linked to this institution yet, or none have opted in. Students must pick this school
+                          during onboarding and keep &quot;visible to DSO&quot; on in Profile.
+                        </td>
+                      </tr>
+                    ) : (
+                      sortedStudents.map((student) => (
+                        <StudentRow
+                          key={student.clerk_user_id}
+                          name={student.name}
+                          country={student.country}
+                          visa={student.visa}
+                          programEnd={student.program_end}
+                          riskScore={student.risk_score}
+                          topRiskFlag={student.top_risk_flag}
+                          lastActive={student.last_active ?? "—"}
+                          riskBand={riskBandFromApi(student)}
+                          isExpanded={selectedStudent === student.clerk_user_id}
+                          onClick={() =>
+                            setSelectedStudent(
+                              selectedStudent === student.clerk_user_id ? null : student.clerk_user_id
+                            )
+                          }
+                        />
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -356,40 +477,39 @@ export default function DSODashboard() {
                     {selectedStudentData.name}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {selectedStudentData.details.email}
+                    Program end {selectedStudentData.program_end} · {selectedStudentData.visa}
                   </p>
                 </div>
 
-                <div className="space-y-4 mb-6">
-                  <div>
-                    <div className="text-xs text-muted-foreground mb-1">Major</div>
-                    <div className="text-sm font-medium">
-                      {selectedStudentData.details.major}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground mb-1">
-                      Enrollment Status
-                    </div>
-                    <div className="text-sm font-medium">
-                      {selectedStudentData.details.enrollmentStatus}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground mb-1">
-                      Work Hours (Weekly)
-                    </div>
-                    <div className="text-sm font-medium">
-                      {selectedStudentData.details.workHours} hours
-                    </div>
+                <div className="mb-6 flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Risk</span>
+                  <RiskBadge level={riskBandFromApi(selectedStudentData)} />
+                  <span className="text-sm font-semibold tabular-nums">{selectedStudentData.risk_score}</span>
+                </div>
+
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold mb-3">Suggested actions (from analysis)</h4>
+                  <div className="space-y-2">
+                    {selectedStudentData.tasks.length > 0 ? (
+                      selectedStudentData.tasks.map((task, idx) => (
+                        <div
+                          key={idx}
+                          className="text-sm p-2 rounded bg-background border border-border"
+                        >
+                          {task}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm text-muted-foreground">No tasks listed for this snapshot.</div>
+                    )}
                   </div>
                 </div>
 
                 <div className="mb-6">
-                  <h4 className="text-sm font-semibold mb-3">Risk Breakdown</h4>
+                  <h4 className="text-sm font-semibold mb-3">Flags</h4>
                   <div className="space-y-2">
-                    {selectedStudentData.details.risks.length > 0 ? (
-                      selectedStudentData.details.risks.map((risk, idx) => (
+                    {selectedStudentData.flag_descriptions.length > 0 ? (
+                      selectedStudentData.flag_descriptions.map((risk, idx) => (
                         <div
                           key={idx}
                           className="text-sm p-2 rounded bg-background border border-border"
@@ -399,7 +519,7 @@ export default function DSODashboard() {
                       ))
                     ) : (
                       <div className="text-sm text-muted-foreground">
-                        No active risks
+                        No flag descriptions in the last saved analysis.
                       </div>
                     )}
                   </div>
@@ -428,6 +548,10 @@ export default function DSODashboard() {
             )}
           </div>
         </div>
+            </>
+          )}
+          </>
+        ) : null}
       </main>
 
       <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>

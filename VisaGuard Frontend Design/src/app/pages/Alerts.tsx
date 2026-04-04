@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
+import { useUser } from "@clerk/react";
 import { Shield, LayoutDashboard, Bot, User, Bell, Briefcase, Search, FileText } from "lucide-react";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { SidebarUserFooter } from "../components/SidebarUserFooter";
 import { AlertCard } from "../components/AlertCard";
 import { motion } from "motion/react";
-import { getStudentId, getAlerts, type Alert } from "../api";
+import { applyAlertAction, getAlerts, type Alert } from "../api";
 
 /** Fallback when backend is not available or student not found. */
 const DUMMY_ALERTS: { id: number; type: "deadline" | "warning" | "info"; title: string; description: string; timestamp: string; urgency: number }[] = [
@@ -28,26 +29,46 @@ function formatAlertTimestamp(alert: Alert): string {
 
 export default function Alerts() {
   const navigate = useNavigate();
+  const { user, isLoaded } = useUser();
   const [activeNav, setActiveNav] = useState("alerts");
-  const [alerts, setAlerts] = useState<{ id: string; type: "deadline" | "warning" | "info"; title: string; description: string; timestamp: string }[]>([]);
+  const [alerts, setAlerts] = useState<
+    {
+      id: string;
+      type: "deadline" | "warning" | "info";
+      title: string;
+      description: string;
+      timestamp: string;
+      isRead: boolean;
+      actionLabel?: string;
+      actionRoute?: string;
+    }[]
+  >([]);
   const [loading, setLoading] = useState(true);
 
-  const sid = getStudentId();
-
   useEffect(() => {
+    if (!isLoaded) return;
+    if (!user?.id) {
+      setLoading(false);
+      setAlerts([]);
+      return;
+    }
+
     const ALERT_TIMEOUT_MS = 5000;
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error("timeout")), ALERT_TIMEOUT_MS);
     });
-    Promise.race([getAlerts(sid), timeoutPromise])
+    Promise.race([getAlerts(user.id), timeoutPromise])
       .then((list) => {
         setAlerts(
           list.map((a, i) => ({
-            id: `alert-${i}`,
+            id: a.id ?? `alert-${i}`,
             type: a.type,
             title: a.title,
             description: a.description,
             timestamp: formatAlertTimestamp(a),
+            isRead: Boolean(a.is_read),
+            actionLabel: a.action_payload?.label,
+            actionRoute: a.action_payload?.route,
           }))
         );
       })
@@ -63,7 +84,21 @@ export default function Alerts() {
         );
       })
       .finally(() => setLoading(false));
-  }, [sid]);
+  }, [isLoaded, user?.id]);
+
+  const runAlertAction = async (
+    alertId: string,
+    action: "mark_read" | "mark_unread" | "resolve" | "reopen" | "snooze" | "unsnooze",
+    updater?: (prev: typeof alerts) => typeof alerts
+  ) => {
+    if (!user?.id) return;
+    try {
+      await applyAlertAction(user.id, alertId, action, action === "snooze" ? 1 : undefined);
+      if (updater) setAlerts((prev) => updater(prev));
+    } catch {
+      // ignore for now; user can retry
+    }
+  };
 
   const handleNavigation = (path: string, nav: string) => {
     setActiveNav(nav);
@@ -186,8 +221,25 @@ export default function Alerts() {
                   title={alert.title}
                   description={alert.description}
                   timestamp={alert.timestamp}
-                  ctaText="Learn More"
-                  onCtaClick={() => handleNavigation("/ai-advisor", "ai")}
+                  isRead={alert.isRead}
+                  ctaText={alert.actionLabel ?? "Learn More"}
+                  onCtaClick={() => navigate(alert.actionRoute ?? "/ai-advisor")}
+                  onToggleRead={() =>
+                    runAlertAction(
+                      alert.id,
+                      alert.isRead ? "mark_unread" : "mark_read",
+                      (prev) =>
+                        prev.map((a) =>
+                          a.id === alert.id ? { ...a, isRead: !a.isRead } : a
+                        )
+                    )
+                  }
+                  onResolve={() =>
+                    runAlertAction(alert.id, "resolve", (prev) => prev.filter((a) => a.id !== alert.id))
+                  }
+                  onSnooze={() =>
+                    runAlertAction(alert.id, "snooze", (prev) => prev.filter((a) => a.id !== alert.id))
+                  }
                 />
               </motion.div>
             ))}

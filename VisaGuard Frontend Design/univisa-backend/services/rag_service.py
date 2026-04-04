@@ -1,4 +1,4 @@
-"""RAG pipeline: embed query -> vector search -> Gemini with context.
+﻿"""RAG pipeline: embed query -> vector search -> Gemini with context.
 Uses Actian VectorAI DB when ACTIAN_VECTORAI_URL is set (see github.com/hackmamba-io/actian-vectorAI-db-beta),
 otherwise ChromaDB (data/chroma_db/).
 """
@@ -76,16 +76,16 @@ def _get_chroma_collection():
     return _chroma_collection
 
 
-SYSTEM_PROMPT = """You are UniVisa's AI advisor — a specialized assistant for international students on F-1 and J-1 visas in the United States.
+SYSTEM_PROMPT = """You are UniVisa's AI advisor â€” a specialized assistant for international students on F-1 and J-1 visas in the United States.
 
 Your job is to answer visa compliance questions accurately and clearly, grounded ONLY in the policy documents provided to you as context.
 
 Rules you must follow:
-1. Never answer from general knowledge alone — always cite the provided context
+1. Never answer from general knowledge alone â€” always cite the provided context
 2. If the context doesn't contain enough information to answer confidently, say so explicitly and recommend the student contact their DSO
 3. Always end your response with: "Source: [document name, section]" for every claim you make
-4. Use plain, clear English — not legal jargon
-5. If the answer has serious consequences (deportation risk, visa termination), clearly flag this with: ⚠️ IMPORTANT: [consequence]
+4. Use plain, clear English â€” not legal jargon
+5. If the answer has serious consequences (deportation risk, visa termination), clearly flag this with: âš ï¸ IMPORTANT: [consequence]
 6. Never guess. Never hallucinate. A wrong answer here can ruin a student's life.
 
 You know the student's profile: {student_context}
@@ -96,12 +96,12 @@ SYSTEM_PROMPT_NO_CONTEXT = """You are UniVisa's AI advisor for F-1 and J-1 inter
 CRITICAL: You MUST answer the student's question with a direct, specific answer in your first 1-2 sentences. Do NOT reply with only or mainly "consult your DSO" or "I recommend consulting your DSO." That is not an answer.
 
 Examples of what to do:
-- "Can I work 10 hours on campus?" → Start with: "Yes. F-1 students may work up to 20 hours per week on campus during the academic term, so 10 hours is allowed."
-- "What if I miss my CPT deadline?" → Start with: "Missing the CPT deadline can mean you are not authorized to work. You should contact your DSO immediately; they may help with a late application or alternatives."
+- "Can I work 10 hours on campus?" â†’ Start with: "Yes. F-1 students may work up to 20 hours per week on campus during the academic term, so 10 hours is allowed."
+- "What if I miss my CPT deadline?" â†’ Start with: "Missing the CPT deadline can mean you are not authorized to work. You should contact your DSO immediately; they may help with a late application or alternatives."
 
 Then in 1-2 more sentences add any important detail (e.g. consequences, next steps). End with one short line: "Confirm with your DSO for your specific situation."
 
-Use plain English. For serious consequences (visa risk), start that part with: ⚠️ IMPORTANT:
+Use plain English. For serious consequences (visa risk), start that part with: âš ï¸ IMPORTANT:
 
 Student profile: {student_context}
 """
@@ -141,12 +141,8 @@ def _vector_search(embedding: list[float], top_k: int = 5) -> list[dict]:
 
 
 # Chat: Gemini API only.
-CHAT_SYSTEM_PROMPT = """You are UniVisa's AI advisor for F-1 and J-1 international students in the US. Answer the student's question clearly and specifically. Give a direct answer in your first 1-2 sentences (e.g. "Yes, F-1 students may work up to 20 hours per week on campus" or "Missing the CPT deadline can mean you're not authorized to work—contact your DSO immediately."). Do not reply with only "consult your DSO." Add a brief note at the end: "For your situation, confirm with your DSO." Use plain English. Student profile: {student_context}"""
+CHAT_SYSTEM_PROMPT = """You are UniVisa's AI advisor for F-1 and J-1 international students in the US. Answer the student's question clearly and specifically. Give a direct answer in your first 1-2 sentences (e.g. "Yes, F-1 students may work up to 20 hours per week on campus" or "Missing the CPT deadline can mean you're not authorized to workâ€”contact your DSO immediately."). Do not reply with only "consult your DSO." Add a brief note at the end: "For your situation, confirm with your DSO." Use plain English. Student profile: {student_context}"""
 
-<<<<<<< HEAD
-
-=======
->>>>>>> shrish-updates
 def _call_gemini_rest(question: str, system_prompt: str, api_key: str) -> dict:
     """Call Gemini via REST API. Returns {answer, sources}. Works with any valid API key."""
     import json
@@ -205,9 +201,6 @@ def query_rag(question: str, student_profile: StudentProfile) -> dict:
             "answer": "Add GEMINI_API_KEY to .env (get a key at https://aistudio.google.com/app/apikey) and restart the backend.",
             "sources": [],
         }
-<<<<<<< HEAD
-    return _call_gemini_rest(question.strip(), system_prompt, api_key)
-=======
 
     # Retrieve relevant chunks (RAG)
     relevant_chunks: list[dict] = []
@@ -239,4 +232,4 @@ def query_rag(question: str, student_profile: StudentProfile) -> dict:
     result = _call_gemini_rest(user_message, system_prompt, api_key)
     result["sources"] = sources
     return result
->>>>>>> shrish-updates
+

@@ -1,25 +1,22 @@
 """
 UniVisa Backend — AI-powered visa compliance risk prediction for F-1/J-1 students.
 """
-import urllib.request
-import json
 from datetime import date
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-_env_path = Path(__file__).resolve().parent / ".env"
-load_dotenv(dotenv_path=_env_path)
+_root = Path(__file__).resolve().parent
+# Support both conventional `.env` and mistakenly-cased `.eNV`.
+load_dotenv(dotenv_path=_root / ".env")
+load_dotenv(dotenv_path=_root / ".eNV")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from models.student import StudentProfile, VisaType, EnrollmentStatus
-<<<<<<< HEAD
-from routers import student, chat, dso, cpt, jobs
-=======
-from routers import student, chat, dso, cpt, compliance, cases
->>>>>>> shrish-updates
+from routers import student, chat, dso, cpt, jobs, compliance, cases, alerts, policy_alerts, institutions
+from services.us_university_catalog import load_us_university_names
 
 app = FastAPI(
     title="UniVisa API",
@@ -50,12 +47,12 @@ app.include_router(student.router)
 app.include_router(chat.router)
 app.include_router(dso.router)
 app.include_router(cpt.router)
-<<<<<<< HEAD
 app.include_router(jobs.router)
-=======
 app.include_router(compliance.router)
 app.include_router(cases.router)
->>>>>>> shrish-updates
+app.include_router(institutions.router)
+app.include_router(alerts.router)
+app.include_router(policy_alerts.router)
 
 
 def _seed_demo_student() -> None:
@@ -98,12 +95,5 @@ def root() -> dict:
 
 @app.get("/universities")
 def get_universities() -> list[str]:
-    """Proxy Hipo Labs API to avoid CORS; returns sorted, deduplicated US university names."""
-    url = "https://universities.hipolabs.com/search?country=United%20States"
-    try:
-        with urllib.request.urlopen(url, timeout=15) as resp:
-            data = json.loads(resp.read().decode())
-    except Exception:
-        return []
-    names = sorted({u["name"] for u in data if isinstance(u.get("name"), str)})
-    return names
+    """US university names for the student picker (GitHub dataset + fallbacks; avoids CORS for the browser)."""
+    return load_us_university_names()

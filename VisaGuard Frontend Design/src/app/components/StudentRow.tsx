@@ -9,6 +9,8 @@ interface StudentRowProps {
   riskScore: number;
   topRiskFlag: string;
   lastActive: string;
+  /** When set (e.g. from backend risk_level), overrides score-only heuristics for badge and row tint */
+  riskBand?: "high" | "medium" | "low";
   isExpanded: boolean;
   onClick: () => void;
 }
@@ -21,6 +23,7 @@ export function StudentRow({
   riskScore,
   topRiskFlag,
   lastActive,
+  riskBand,
   isExpanded,
   onClick,
 }: StudentRowProps) {
@@ -30,9 +33,11 @@ export function StudentRow({
     return "low";
   };
 
-  const getRiskColor = (score: number) => {
-    if (score > 70) return "bg-[#FF4D4D]/5 border-l-[#FF4D4D]";
-    if (score >= 40) return "bg-[#FFB347]/5 border-l-[#FFB347]";
+  const level = riskBand ?? getRiskLevel(riskScore);
+
+  const getRiskColor = (lvl: "high" | "medium" | "low") => {
+    if (lvl === "high") return "bg-[#FF4D4D]/5 border-l-[#FF4D4D]";
+    if (lvl === "medium") return "bg-[#FFB347]/5 border-l-[#FFB347]";
     return "bg-[#4CAF50]/5 border-l-[#4CAF50]";
   };
 
@@ -40,7 +45,7 @@ export function StudentRow({
     <tr
       className={cn(
         "border-b border-border cursor-pointer transition-colors hover:bg-muted/50 border-l-4",
-        getRiskColor(riskScore),
+        getRiskColor(level),
         isExpanded && "bg-muted/50"
       )}
       onClick={onClick}
@@ -54,7 +59,7 @@ export function StudentRow({
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="font-semibold">{riskScore}</span>
-          <RiskBadge level={getRiskLevel(riskScore)} />
+          <RiskBadge level={level} />
         </div>
       </td>
       <td className="px-4 py-3 text-sm text-muted-foreground max-w-xs truncate">
