@@ -24,10 +24,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
-
-# Open CORS for all origins. Note: CORS forbids `allow_origins=["*"]` together with
-# `allow_credentials=True` in browsers — that pair does not fix real preflight failures.
-# If you need cookies cross-site, switch back to explicit `allow_origins=[...]` + `True`.
+# FORCE CORS (final working version): "*" requires allow_credentials=False (browser CORS spec).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
