@@ -27,17 +27,17 @@ app = FastAPI(
 
 
 def _cors_origins() -> list[str]:
-    """Default local + Vercel origins; allow comma-separated overrides via CORS_ORIGINS."""
     default_origins = [
         "http://localhost:5173",
-        "https://your-vercel-app.vercel.app",
+        "https://univisa.vercel.app",
     ]
-    raw = os.getenv("CORS_ORIGINS", "").strip()
-    if not raw:
-        return default_origins
-    extras = [origin.strip() for origin in raw.split(",") if origin.strip()]
-    # Preserve order while removing duplicates.
-    return list(dict.fromkeys(default_origins + extras))
+
+    extra = os.getenv("CORS_ORIGINS")
+
+    if extra:
+        return default_origins + [origin.strip() for origin in extra.split(",")]
+
+    return default_origins
 
 
 app.add_middleware(
