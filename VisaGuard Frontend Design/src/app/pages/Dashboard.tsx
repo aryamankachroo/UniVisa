@@ -85,7 +85,7 @@ export default function Dashboard() {
 
   // Backend API base (same convention as Onboarding)
   const API_BASE =
-    (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "http://localhost:8000";
+    (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "";
 
   useEffect(() => {
     if (!isLoaded || !user) return;

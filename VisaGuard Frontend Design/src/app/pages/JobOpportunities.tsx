@@ -12,7 +12,7 @@ import { SidebarUserFooter } from "../components/SidebarUserFooter";
 // ─── API base (same pattern as your existing api.ts) ──────────────────────────
 const API_BASE =
   (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ??
-  "http://localhost:8000";
+  "";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

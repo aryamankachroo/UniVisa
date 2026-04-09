@@ -10,7 +10,7 @@ import { Slider } from "../components/ui/slider";
 import { Shield, GraduationCap, Users, ArrowRight } from "lucide-react";
 import { ThemeToggle } from "../components/ThemeToggle";
 
-const API_BASE = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "http://localhost:8000";
+const API_BASE = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "";
 const INSTITUTIONS_API = `${API_BASE}/api/institutions`;
 const CASES_SUBMIT_API = `${API_BASE}/api/cases/submit`;
 
@@ -122,6 +122,16 @@ interface FormData {
   sevisTerminatedBefore: SevisHistory;
 }
 
+interface AnalysisResult {
+  riskScore: number;
+  riskLevel: string;
+  flags: { code: string; description?: string | null }[];
+  tasks: string[];
+  deadlines: { nextDeadline: string | null; daysUntilNextDeadline: number | null };
+  urgent_tasks?: string[];
+  compliance_explanation?: string;
+}
+
 export default function Onboarding() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -162,13 +172,7 @@ export default function Onboarding() {
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<{
-    riskScore: number;
-    riskLevel: string;
-    flags: { code: string; description?: string | null }[];
-    tasks: string[];
-    deadlines: { nextDeadline: string | null; daysUntilNextDeadline: number | null };
-  } | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
 
   const [institutions, setInstitutions] = useState<InstitutionOption[]>([]);
   const [institutionsLoading, setInstitutionsLoading] = useState(false);
@@ -441,10 +445,16 @@ export default function Onboarding() {
                   return;
                 }
                 setStudentFlowStarted(true);
-                openSignIn({}).catch(() => {
-                  // If modal fails to open for any reason, keep the splash visible.
+                try {
+                  const maybePromise = openSignIn({});
+                  void Promise.resolve(maybePromise).catch(() => {
+                    // If modal fails to open for any reason, keep the splash visible.
+                    setStudentFlowStarted(false);
+                  });
+                } catch {
+                  // If modal throws synchronously, keep the splash visible.
                   setStudentFlowStarted(false);
-                });
+                }
               }}
               className="group bg-card border-2 border-border hover:border-primary rounded-lg p-8 transition-all hover:scale-[1.02]"
             >
@@ -566,7 +576,7 @@ export default function Onboarding() {
                 <div>
                   <h3 className="text-sm font-semibold mb-2">Urgent tasks</h3>
                   <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                    {analysisResult.urgent_tasks.map((task, idx) => (
+                    {analysisResult.urgent_tasks.map((task: string, idx: number) => (
                       <li key={idx}>{task}</li>
                     ))}
                   </ul>

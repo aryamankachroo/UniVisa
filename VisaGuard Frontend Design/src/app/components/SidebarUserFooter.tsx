@@ -3,7 +3,7 @@ import { LogOut } from "lucide-react";
 import { useClerk, useUser } from "@clerk/react";
 
 const API_BASE =
-  (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "http://localhost:8000";
+  (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "";
 
 function universityFromLocalStorage(): string | null {
   try {

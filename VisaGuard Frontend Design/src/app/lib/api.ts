@@ -1,7 +1,6 @@
-/** Backend base URL. Must match CORS and running server (e.g. run backend with ./run.sh). */
-const fromEnv = import.meta.env?.VITE_API_BASE;
-export const API_BASE =
-  fromEnv != null ? String(fromEnv).replace(/\/$/, "") : "http://localhost:8000";
+/** Backend base URL from Vite environment (no localhost fallback in production). */
+const fromEnv = import.meta.env?.VITE_API_URL;
+export const API_BASE = fromEnv != null ? String(fromEnv).replace(/\/$/, "") : "";
 
 const STUDENT_ID_KEY = "uniVisaStudentId";
 

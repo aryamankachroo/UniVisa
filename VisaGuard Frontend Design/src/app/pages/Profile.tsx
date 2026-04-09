@@ -31,7 +31,7 @@ import { RiskBadge } from "../components/RiskBadge";
 import { motion } from "motion/react";
 
 const API_BASE =
-  (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "http://localhost:8000";
+  (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "";
 
 type CasePayload = {
   profile: Record<string, unknown> | null;
