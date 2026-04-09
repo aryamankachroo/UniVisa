@@ -1,6 +1,7 @@
 """
 UniVisa Backend — AI-powered visa compliance risk prediction for F-1/J-1 students.
 """
+import os
 from datetime import date
 from pathlib import Path
 
@@ -24,20 +25,24 @@ app = FastAPI(
     version="0.1.0",
 )
 
+
+def _cors_origins() -> list[str]:
+    """Default local + Vercel origins; allow comma-separated overrides via CORS_ORIGINS."""
+    default_origins = [
+        "http://localhost:5173",
+        "https://your-vercel-app.vercel.app",
+    ]
+    raw = os.getenv("CORS_ORIGINS", "").strip()
+    if not raw:
+        return default_origins
+    extras = [origin.strip() for origin in raw.split(",") if origin.strip()]
+    # Preserve order while removing duplicates.
+    return list(dict.fromkeys(default_origins + extras))
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
-        "http://localhost:5176",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "http://127.0.0.1:5175",
-        "http://127.0.0.1:5176",
-    ],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
