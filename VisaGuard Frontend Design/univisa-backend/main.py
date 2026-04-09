@@ -35,7 +35,10 @@ def _cors_origins() -> list[str]:
     extra = os.getenv("CORS_ORIGINS")
 
     if extra:
-        return default_origins + [origin.strip() for origin in extra.split(",")]
+        # Accept comma-separated explicit origins from env.
+        env_origins = [origin.strip() for origin in extra.split(",") if origin.strip()]
+        # Keep order while removing duplicates.
+        return list(dict.fromkeys(default_origins + env_origins))
 
     return default_origins
 
@@ -43,6 +46,10 @@ def _cors_origins() -> list[str]:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
+    # Allow Vercel preview deployments like:
+    # https://univisa-git-branch-owner.vercel.app
+    # https://univisa-abc123-owner.vercel.app
+    allow_origin_regex=r"^https:\/\/univisa(?:-[a-zA-Z0-9-]+)?\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
