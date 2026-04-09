@@ -1,6 +1,7 @@
 """
 UniVisa Backend — AI-powered visa compliance risk prediction for F-1/J-1 students.
 """
+import os
 from datetime import date
 from pathlib import Path
 
@@ -24,11 +25,16 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# FORCE CORS (final working version): "*" requires allow_credentials=False (browser CORS spec).
+# CORS: wildcard origin requires allow_credentials=False (browser spec).
+# After deploy, verify: GET / shows cors.profile below; GET with Origin should include
+# Access-Control-Allow-Origin: * and must NOT send Access-Control-Allow-Credentials: true.
+CORS_ALLOW_ORIGINS = ["*"]
+CORS_ALLOW_CREDENTIALS = False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=CORS_ALLOW_ORIGINS,
+    allow_credentials=CORS_ALLOW_CREDENTIALS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -80,7 +86,20 @@ def startup() -> None:
 
 @app.get("/")
 def root() -> dict:
-    return {"message": "UniVisa API", "docs": "/docs"}
+    """Runtime fingerprint for deploy/debug — if this does not match after deploy, the new image is not live."""
+    return {
+        "message": "UniVisa API",
+        "docs": "/docs",
+        "cors": {
+            "allow_origins": CORS_ALLOW_ORIGINS,
+            "allow_credentials": CORS_ALLOW_CREDENTIALS,
+            "profile": "wildcard_no_credentials_v2",
+        },
+        "cloud_run": {
+            "revision": os.getenv("K_REVISION"),
+            "service": os.getenv("K_SERVICE"),
+        },
+    }
 
 
 @app.get("/universities")
