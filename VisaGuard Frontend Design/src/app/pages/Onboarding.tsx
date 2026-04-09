@@ -213,16 +213,21 @@ export default function Onboarding() {
     let cancelled = false;
     setSavedCaseLookupDone(false);
 
-    fetch(casesMeUrl(user.id))
+    const ac = new AbortController();
+    const timeoutMs = 15_000;
+    const timeoutId = window.setTimeout(() => ac.abort(), timeoutMs);
+
+    fetch(casesMeUrl(user.id), { signal: ac.signal })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { risk?: unknown } | null) => {
         if (cancelled || !data?.risk) return;
         navigate("/dashboard", { replace: true });
       })
       .catch(() => {
-        /* stay on onboarding if API unreachable */
+        /* stay on onboarding if API unreachable or slow */
       })
       .finally(() => {
+        window.clearTimeout(timeoutId);
         if (!cancelled) setSavedCaseLookupDone(true);
       });
 
